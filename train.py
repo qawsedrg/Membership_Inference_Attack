@@ -63,20 +63,27 @@ if __name__ == "__main__":
     for epoch in range(args.n_epochs):
 
         epoch_loss = 0
+        acc = 0
         with tqdm(enumerate(trainloader, 0), total=len(trainloader)) as t:
             for i, data in t:
+                correct_items = 0
+
                 inputs, labels = data[0].to(device), data[1].to(device)
 
                 optimizer.zero_grad()
 
                 outputs = net(inputs)
+                correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                acc_batch = correct_items / args.batch_size
+                acc += acc_batch
+
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
 
                 epoch_loss += loss.item()
-                t.set_description("Epoch %i" % epoch)
-                t.set_postfix(loss="{:.3f}".format(epoch_loss / (i + 1)))
+                t.set_description("Epoch {:}/{:}".format(epoch, args.n_epochs))
+                t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)
