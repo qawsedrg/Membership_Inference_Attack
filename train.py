@@ -1,28 +1,19 @@
+import os.path
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
+import argparse
+from tqdm import tqdm
 
-transform = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
-batch_size = 64
-
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                        download=True, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                          shuffle=True, num_workers=2)
-
-testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                       download=True, transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                         shuffle=False, num_workers=2)
-
-classes = ('plane', 'car', 'bird', 'cat',
-           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+parser = argparse.ArgumentParser()
+parser.add_argument("--n_epochs", default=30, type=int)
+parser.add_argument("--batch_size", default=64, type=int)
+parser.add_argument("--save_to", default='models', type=str)
+parser.add_argument("--name", default='cifar10', type=str)
 
 
 class Net(nn.Module):
@@ -44,34 +35,49 @@ class Net(nn.Module):
         x = self.fc3(x)
         return x
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-net = Net()
-net.to(device)
+if __name__ == "__main__":
+    args = parser.parse_args()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-for epoch in range(2):
+    net = Net()
+    net.to(device)
 
-    running_loss = 0.0
-    for i, data in enumerate(trainloader, 0):
-        inputs, labels = data[0].to(device), data[1].to(device)
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                            download=True, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
+                                              shuffle=True, num_workers=2)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                           download=True, transform=transform)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size,
+                                             shuffle=False, num_workers=2)
 
-        optimizer.zero_grad()
+    classes = ('plane', 'car', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-        # forward + backward + optimize
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    for epoch in range(args.n_epochs):
 
-        running_loss += loss.item()
-        if i % 2000 == 1999:
-            print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 2000))
-            running_loss = 0.0
+        epoch_loss = 0
+        with tqdm(enumerate(trainloader, 0), total=len(trainloader)) as t:
+            for i, data in t:
+                inputs, labels = data[0].to(device), data[1].to(device)
 
-print('Finished Training')
+                optimizer.zero_grad()
 
-PATH = 'models/cifar10.pth'
-torch.save(net.state_dict(), PATH)
+                outputs = net(inputs)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                t.set_description("Epoch %i" % epoch)
+                t.set_postfix(loss="{:.3f}".format(epoch_loss / (i + 1)))
+
+    if not os.path.exists(args.save_to):
+        os.makedirs(args.save_to)
+    torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
