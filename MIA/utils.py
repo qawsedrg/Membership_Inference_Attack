@@ -1,7 +1,4 @@
-import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
-import torch.optim as optim
+from torch.utils.data import Dataset
 
 
 class trainset(Dataset):

@@ -1,6 +1,6 @@
-import torch
-from sklearn.model_selection import train_test_split
 import torch.nn as nn
+from sklearn.model_selection import train_test_split
+
 from utils import *
 
 
