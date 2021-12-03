@@ -11,7 +11,7 @@ class trainset(Dataset):
         self.transform = transform
 
     def __getitem__(self, index):
-        return self.transform(self.X[index, :]), self.Y[index]
+        return self.transform(self.X[index, :]) if self.transform else self.X[index, :], self.Y[index]
 
     def __len__(self):
         return self.X.shape[0]
