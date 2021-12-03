@@ -1,17 +1,20 @@
 import torch
-from torch.utils.data import Dataset
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+from torch.utils.data import Dataset
 
 
 class trainset(Dataset):
-    def __init__(self, X, Y, transform):
+    def __init__(self, X, Y=None, transform=None):
         self.X = X
         self.Y = Y
         self.transform = transform
 
     def __getitem__(self, index):
-        return self.transform(self.X[index, :]) if self.transform else self.X[index, :], self.Y[index]
+        if self.Y is None:
+            return self.transform(self.X[index, :]) if self.transform is not None else self.X[index, :]
+        else:
+            return self.transform(self.X[index, :]) if self.transform is not None else self.X[index, :], self.Y[index]
 
     def __len__(self):
         return self.X.shape[0]

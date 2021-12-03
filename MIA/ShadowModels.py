@@ -1,10 +1,12 @@
 import numpy as np
-from sklearn.model_selection import train_test_split
-import torch.optim as optim
-from MIA.utils import *
 import torch
-from torch.utils.data import DataLoader
+import torch.optim as optim
 import torchvision.transforms as transforms
+from sklearn.model_selection import train_test_split
+from torch import nn
+from torch.utils.data import DataLoader
+
+from MIA.utils import trainset, train, forward, DataStruct
 
 
 class ShadowModels:
@@ -15,19 +17,19 @@ class ShadowModels:
         self.Y = Y
         self.epoches = epoches
         self.device = device
-        self.data=None
+        self.data = None
 
     def train(self):
         X_in = torch.Tensor().to(self.device)
         Y_in = torch.Tensor().to(self.device)
         X_out = torch.Tensor().to(self.device)
         Y_out = torch.Tensor().to(self.device)
+        transform = transforms.Compose(
+            [transforms.ToTensor(),
+             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         for i in range(self.N):
             model = self.models
             optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-            transform = transforms.Compose(
-                [transforms.ToTensor(),
-                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
             shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
                                                                                             test_size=0.5,
                                                                                             random_state=i)
@@ -45,4 +47,4 @@ class ShadowModels:
                 Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
                 Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
 
-        self.data=DataStruct(X_in, X_out, Y_in, Y_out)
+        self.data = DataStruct(X_in, X_out, Y_in, Y_out)

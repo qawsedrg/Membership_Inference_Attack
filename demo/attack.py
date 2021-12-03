@@ -1,9 +1,15 @@
 import argparse
+
 import torch
-from model import CIFAR
 import torchvision
-from MIA.ShadowModels import *
-from MIA.AttackModels import *
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+
+from MIA.AttackModels import ConfidenceVector
+from MIA.ShadowModels import ShadowModels
+from MIA.utils import trainset
+from model import CIFAR
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=30, type=int)
@@ -26,11 +32,19 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, 2, X, Y, 1, device)
     shadow_models.train()
 
-    attack_model = ConfidenceVector(shadow_models,10,device,-1)
+    attack_model = ConfidenceVector(shadow_models, 10, device, -1)
     attack_model.train()
 
-    loader = DataLoader(Dataset(X), batch_size=64, shuffle=False)
-    predicted=torch.tensor().to(device)
-    for i,x in enumerate(loader):
-        x=x.to(device)
-        predicted=torch.cat((attack_model(F.softmax(net(x))),predicted),dim=0)
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    loader = DataLoader(trainset(X, transform=transform), batch_size=1024, shuffle=False)
+    membership=torch.Tensor().to(device)
+    confidence_vectors = torch.Tensor().to(device)
+    for data in loader:
+        data=data.to(device)
+        data=F.softmax(net(data),dim=-1)
+        result=attack_model(data)
+        membership = torch.cat((membership, result[1]), dim=0)
+        confidence_vectors = torch.cat((confidence_vectors, result[0]), dim=0)
+    print("fini")
