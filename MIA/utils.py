@@ -1,19 +1,22 @@
+import torch
 from torch.utils.data import Dataset
 
 
 class trainset(Dataset):
-    def __init__(self, X, Y):
+    def __init__(self, X, Y,transform):
         self.X = X
         self.Y = Y
+        self.transform=transform
 
     def __getitem__(self, index):
-        return self.X[index, :], self.Y[index, :]
+        return self.transform(self.X[index, :]), self.Y[index]
 
     def __len__(self):
         return self.X.shape[0]
 
 
 def train(model, loader, device, optimizer, criterion, epoches):
+    model.train()
     for epoch in range(epoches):
 
         running_loss = 0.0
@@ -32,3 +35,11 @@ def train(model, loader, device, optimizer, criterion, epoches):
                       (epoch + 1, i + 1, running_loss / 2000))
                 running_loss = 0.0
     return model
+
+def forward(model,loader,device):
+    result=torch.Tensor().to(device)
+    for i, data in enumerate(loader, 0):
+        inputs, labels = data[0].to(device), data[1].to(device)
+        outputs = model(inputs)
+        result=torch.cat((result,outputs),dim=0)
+    return result

@@ -1,8 +1,8 @@
 from utils import *
 from ShadowModels import *
-from AttackModels import *
+import AttackModels
 
-class ConfidenceVector(AttackModel):
+
+class ConfidenceVector(AttackModels.AttackModel):
     def __init__(self):
-        super(ConfidenceVector, self).__init__()
-    
+        super().__init__()
