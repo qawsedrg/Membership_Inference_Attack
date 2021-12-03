@@ -2,7 +2,8 @@ import argparse
 import torch
 from model import CIFAR
 import torchvision
-from MIA import ShadowModels
+from MIA.ShadowModels import *
+from MIA.AttackModels import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=30, type=int)
@@ -20,8 +21,10 @@ if __name__ == "__main__":
     # todo: should be repalced by a hill-climbing and GAN
     testset = torchvision.datasets.CIFAR10(root='../data', train=False,
                                            download=True)
-    X,Y=testset.data,testset.targets
+    X, Y = testset.data, testset.targets
 
-    shadow_models=ShadowModels.ShadowModels(net,1,X,Y,1,device)
+    shadow_models = ShadowModels(net, 2, X, Y, 1, device)
     shadow_models.train()
 
+    attack_model = ConfidenceVector(shadow_models)
+    attack_model.train()

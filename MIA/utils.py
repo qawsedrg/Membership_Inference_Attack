@@ -1,12 +1,14 @@
 import torch
 from torch.utils.data import Dataset
+from torch import nn
+import torch.nn.functional as F
 
 
 class trainset(Dataset):
-    def __init__(self, X, Y,transform):
+    def __init__(self, X, Y, transform):
         self.X = X
         self.Y = Y
-        self.transform=transform
+        self.transform = transform
 
     def __getitem__(self, index):
         return self.transform(self.X[index, :]), self.Y[index]
@@ -36,10 +38,33 @@ def train(model, loader, device, optimizer, criterion, epoches):
                 running_loss = 0.0
     return model
 
-def forward(model,loader,device):
-    result=torch.Tensor().to(device)
+
+def forward(model, loader, device):
+    result = torch.Tensor().to(device)
     for i, data in enumerate(loader, 0):
         inputs, labels = data[0].to(device), data[1].to(device)
         outputs = model(inputs)
-        result=torch.cat((result,outputs),dim=0)
+        result = torch.cat((result, outputs), dim=0)
     return result
+
+
+class DataStruct():
+    def __init__(self, data_in, data_out, target_in, target_out):
+        self.data_in = data_in
+        self.data_out = data_out
+        self.target_in = target_in
+        self.target_out = target_out
+
+
+class attackmodel(nn.Module):
+    def __init__(self, n):
+        super().__init__()
+        self.fc2 = nn.Linear(n, 32)
+        self.fc2 = nn.Linear(32, 64)
+        self.fc3 = nn.Linear(64, 10)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
