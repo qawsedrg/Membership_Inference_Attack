@@ -41,7 +41,7 @@ class ShadowModels:
                 loader_test = DataLoader(trainset(shadow_X_test, shadow_Y_test, transform), batch_size=64,
                                          shuffle=False)
                 X_in = torch.cat((X_in, forward(model, loader_train, self.device)), dim=0)
-                X_out = torch.cat((X_in, forward(model, loader_test, self.device)), dim=0)
+                X_out = torch.cat((X_out, forward(model, loader_test, self.device)), dim=0)
                 Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
                 Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
 

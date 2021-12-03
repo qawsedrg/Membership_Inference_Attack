@@ -19,6 +19,7 @@ class trainset(Dataset):
 
 def train(model, loader, device, optimizer, criterion, epoches):
     model.train()
+    model.to(device)
     for epoch in range(epoches):
 
         running_loss = 0.0
@@ -59,12 +60,12 @@ class DataStruct():
 class attackmodel(nn.Module):
     def __init__(self, n):
         super().__init__()
-        self.fc2 = nn.Linear(n, 32)
+        self.fc1 = nn.Linear(n, 32)
         self.fc2 = nn.Linear(32, 64)
         self.fc3 = nn.Linear(64, 10)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = F.softmax(self.fc3(x))
         return x
