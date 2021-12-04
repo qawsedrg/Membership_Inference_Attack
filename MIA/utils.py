@@ -50,7 +50,7 @@ def train(model, loader, device, optimizer, criterion, epoches):
 def forward(model, loader, device):
     result = torch.Tensor().to(device)
     for i, data in enumerate(loader, 0):
-        inputs, labels = data[0].to(device), data[1].to(device)
+        inputs = data[0].to(device)
         outputs = model(inputs)
         result = torch.cat((result, outputs), dim=0)
     return result

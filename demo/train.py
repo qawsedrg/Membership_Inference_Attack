@@ -1,13 +1,17 @@
 import argparse
 import os.path
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from MIA.utils import trainset
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
@@ -20,20 +24,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = CIFAR()
+    net = CIFAR(10)
     net.to(device)
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    trainset = torchvision.datasets.CIFAR10(root='../data', train=True,
-                                            download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
-                                              shuffle=True, num_workers=2)
-    testset = torchvision.datasets.CIFAR10(root='../data', train=False,
-                                           download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size,
-                                             shuffle=False, num_workers=2)
+    train = torchvision.datasets.CIFAR10(root='../data', train=True,
+                                         download=True)
+    test = torchvision.datasets.CIFAR10(root='../data', train=False,
+                                        download=True)
+    X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
+    target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
+    target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,
+                                                                                    random_state=42)
+    trainloader = DataLoader(trainset(target_X_train, target_Y_train, transform), batch_size=args.batch_size,
+                             shuffle=True, num_workers=2)
+    testloader = DataLoader(trainset(target_X_test, target_Y_test, transform), batch_size=args.batch_size,
+                            shuffle=False, num_workers=2)
 
     classes = ('plane', 'car', 'bird', 'cat',
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -87,4 +95,5 @@ if __name__ == "__main__":
                     t.set_description("Epoch {:}/{:} VAL".format(epoch, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         if val_acc > val_acc_max:
-            torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+            pass
+            # torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

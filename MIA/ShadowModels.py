@@ -10,7 +10,7 @@ from MIA.utils import trainset, train, forward, DataStruct
 
 
 class ShadowModels:
-    def __init__(self, models, N: int, X, Y, epoches, device):
+    def __init__(self, models: nn.Module, N: int, X: torch.Tensor, Y: torch.Tensor, epoches: int, device: torch.device):
         self.models = models
         self.N = N
         self.X = X
