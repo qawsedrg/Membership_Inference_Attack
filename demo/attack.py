@@ -29,7 +29,7 @@ if __name__ == "__main__":
                                            download=True)
     X, Y = testset.data, testset.targets
 
-    shadow_models = ShadowModels(net, 1, X, Y, 20, device)
+    shadow_models = ShadowModels(net, 1, X, Y, 30, device)
     shadow_models.train()
 
     attack_model = ConfidenceVector(shadow_models, 10, device, -1)
