@@ -75,7 +75,7 @@ if __name__ == "__main__":
                 optimizer.step()
 
                 epoch_loss += loss.item()
-                t.set_description("Epoch {:}/{:} Train".format(epoch, args.n_epochs))
+                t.set_description("Epoch {:}/{:} Train".format(epoch + 1, args.n_epochs))
                 t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
 
         net.eval()
@@ -92,7 +92,7 @@ if __name__ == "__main__":
                     val_acc_batch = correct_items / args.batch_size
                     val_acc += val_acc_batch
 
-                    t.set_description("Epoch {:}/{:} VAL".format(epoch, args.n_epochs))
+                    t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         if val_acc > val_acc_max:
             pass

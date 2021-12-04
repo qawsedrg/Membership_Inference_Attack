@@ -42,17 +42,23 @@ def train(model, loader, device, optimizer, criterion, epoches):
                 optimizer.step()
 
                 epoch_loss += loss.item()
-                t.set_description("Epoch {:}/{:} Train".format(epoch, epoches))
+                t.set_description("Epoch {:}/{:} Train".format(epoch + 1, epoches))
                 t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
     return model
 
 
 def forward(model, loader, device):
     result = torch.Tensor().to(device)
-    for i, data in enumerate(loader, 0):
-        inputs = data[0].to(device)
-        outputs = model(inputs)
-        result = torch.cat((result, outputs), dim=0)
+    model.to(device)
+    model.eval()
+    with torch.no_grad():
+        for i, data in enumerate(loader, 0):
+            if type(data) is torch.Tensor:
+                inputs = data.to(device)
+            else:
+                inputs = data[0].to(device)
+            outputs = model(inputs)
+            result = torch.cat((result, outputs), dim=0)
     return result
 
 

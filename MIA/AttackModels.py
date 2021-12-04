@@ -1,5 +1,6 @@
 from typing import Optional
 
+import numpy as np
 import torch
 import torch.optim as optim
 import torchvision.transforms as transforms
@@ -45,18 +46,19 @@ class ConfidenceVector():
         for i in range(self.n_classes):
             x = X[classes == i]
             y = Y[classes == i]
-            result = torch.cat((result, self.attack_models[i](x)))
+            with torch.no_grad():
+                result = torch.cat((result, self.attack_models[i](x)))
             data_x = torch.cat((data_x, x), dim=0)
             data_y = torch.cat((data_y, y), dim=0)
         return data_x, data_y, result
 
-    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[torch.Tensor] = None,
-                 X_out: Optional[torch.Tensor] = None,
-                 Y_in: Optional[torch.Tensor] = None,
-                 Y_out: Optional[torch.Tensor] = None):
+    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+                 X_out: Optional[np.ndarray] = None,
+                 Y_in: Optional[np.ndarray] = None,
+                 Y_out: Optional[np.ndarray] = None):
         if target is not None:
-            Y_in = Y_in.to(self.device)
-            Y_out = Y_out.to(self.device)
+            Y_in = torch.from_numpy(Y_in).to(self.device)
+            Y_out = torch.from_numpy(Y_out).to(self.device)
             transform = transforms.Compose(
                 [transforms.ToTensor(),
                  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -64,6 +66,7 @@ class ConfidenceVector():
             loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=True)
             output_in = forward(target, loader, self.device)
             loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=True)
+            torch.cuda.empty_cache()
             output_out = forward(target, loader, self.device)
             result_x_in, result_y_in, result_in = self(output_in, Y_in)
             result_x_out, result_y_out, result_out = self(output_out, Y_out)
@@ -83,6 +86,7 @@ class ConfidenceVector():
                 attack_model = self.attack_models[i]
                 loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
                 for data in loader:
-                    correct += torch.sum((attack_model(data[0]) > 0.5).float() == data[1]).cpu().numpy()
+                    with torch.no_grad():
+                        correct += torch.sum((attack_model(data[0]) > 0.5).float() == data[1]).cpu().numpy()
             print(
                 "acc : {:.2f}".format(correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
