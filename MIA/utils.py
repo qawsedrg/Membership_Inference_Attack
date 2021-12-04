@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 class trainset(Dataset):
@@ -24,22 +25,25 @@ def train(model, loader, device, optimizer, criterion, epoches):
     model.train()
     model.to(device)
     for epoch in range(epoches):
+        epoch_loss = 0
+        acc = 0
+        with tqdm(enumerate(loader, 0), total=len(loader)) as t:
+            for i, data in t:
+                correct_items = 0
+                inputs, labels = data[0].to(device), data[1].to(device)
 
-        running_loss = 0.0
-        for i, data in enumerate(loader, 0):
-            inputs, labels = data[0].to(device), data[1].to(device)
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                acc_batch = correct_items / loader.batch_size
+                acc += acc_batch
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
 
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-            if i % 2000 == 1999:
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
+                epoch_loss += loss.item()
+                t.set_description("Epoch {:}/{:} Train".format(epoch, epoches))
+                t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
     return model
 
 
@@ -63,12 +67,10 @@ class DataStruct():
 class attackmodel(nn.Module):
     def __init__(self, n):
         super().__init__()
-        self.fc1 = nn.Linear(n, 32)
-        self.fc2 = nn.Linear(32, 64)
-        self.fc3 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(n, 64)
+        self.fc2 = nn.Linear(64, 1)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = torch.squeeze(nn.Sigmoid()(self.fc3(x)), dim=-1)
+        x = torch.squeeze(nn.Sigmoid()(self.fc2(x)), dim=-1)
         return x

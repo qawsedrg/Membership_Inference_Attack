@@ -29,7 +29,7 @@ class ShadowModels:
              transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         for i in range(self.N):
             model = self.models
-            optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+            optimizer = optim.Adam(model.parameters(), lr=0.001)
             shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
                                                                                             test_size=0.5,
                                                                                             random_state=i)
