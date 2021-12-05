@@ -20,7 +20,7 @@ parser.add_argument("--name", default='cifar10', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
 parser.add_argument("--shadow_nepoch", default=10, type=int)
 parser.add_argument("--attack_nepoch", default=5, type=int)
-parser.add_argument("--topx", default=-1, type=int)
+parser.add_argument("--topx", default=3, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -46,8 +46,8 @@ if __name__ == "__main__":
 
     attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
-    # attack_model.evaluate()
-    # attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
+    attack_model.evaluate()
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -59,6 +59,8 @@ if __name__ == "__main__":
         for data in loader:
             data = data.to(device)
             data = F.softmax(net(data), dim=-1)
+            if args.topx != -1:
+                data = torch.sort(data, dim=-1)[0][:, -args.topx:]
             result = attack_model(data)
             membership = torch.cat((membership, result[2]), dim=0)
             confidence_vectors = torch.cat((confidence_vectors, result[0]), dim=0)
