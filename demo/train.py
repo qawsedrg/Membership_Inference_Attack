@@ -95,5 +95,4 @@ if __name__ == "__main__":
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         if val_acc > val_acc_max:
-            pass
-            # torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+            torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
