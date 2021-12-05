@@ -46,19 +46,20 @@ if __name__ == "__main__":
 
     attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
-    attack_model.evaluate()
-    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
+    # attack_model.evaluate()
+    # attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    loader = DataLoader(trainset(target_X, target_Y, transform=transform), batch_size=1024, shuffle=False)
+    loader = DataLoader(trainset(target_X, transform=transform), batch_size=1024, shuffle=False)
     membership = torch.Tensor().to(device)
     confidence_vectors = torch.Tensor().to(device)
-    for data in loader:
-        data = data.to(device)
-        data = F.softmax(net(data), dim=-1)
-        result = attack_model(*data)
-        membership = torch.cat((membership, result[2]), dim=0)
-        confidence_vectors = torch.cat((confidence_vectors, result[1]), dim=0)
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            data = F.softmax(net(data), dim=-1)
+            result = attack_model(data)
+            membership = torch.cat((membership, result[2]), dim=0)
+            confidence_vectors = torch.cat((confidence_vectors, result[0]), dim=0)
     print("fini")

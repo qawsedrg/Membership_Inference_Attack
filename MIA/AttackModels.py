@@ -32,24 +32,26 @@ class ConfidenceVector():
                 attack_model = attackmodel(train_x.shape[-1])
                 optimizer = optim.Adam(attack_model.parameters(), lr=0.001)
                 loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
+                print("Training attack model for class {:}".format(i))
                 attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                      epoches=self.epoches)
                 self.attack_models.append(attack_model)
         else:
             pass
 
-    def __call__(self, X: torch.Tensor, Y: torch.Tensor):
+    def __call__(self, X: torch.Tensor, Y: Optional[torch.Tensor] = None):
         classes = torch.max(X, dim=-1).indices
         result = torch.Tensor().to(self.device)
         data_x = torch.Tensor().to(self.device)
         data_y = torch.Tensor().to(self.device)
         for i in range(self.n_classes):
             x = X[classes == i]
-            y = Y[classes == i]
             with torch.no_grad():
                 result = torch.cat((result, self.attack_models[i](x)))
             data_x = torch.cat((data_x, x), dim=0)
-            data_y = torch.cat((data_y, y), dim=0)
+            if Y is not None:
+                y = Y[classes == i]
+                data_y = torch.cat((data_y, y), dim=0)
         return data_x, data_y, result
 
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
@@ -57,8 +59,6 @@ class ConfidenceVector():
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
         if target is not None:
-            Y_in = torch.from_numpy(Y_in).to(self.device)
-            Y_out = torch.from_numpy(Y_out).to(self.device)
             transform = transforms.Compose(
                 [transforms.ToTensor(),
                  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -66,13 +66,12 @@ class ConfidenceVector():
             loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=True)
             output_in = forward(target, loader, self.device)
             loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=True)
-            torch.cuda.empty_cache()
             output_out = forward(target, loader, self.device)
-            result_x_in, result_y_in, result_in = self(output_in, Y_in)
-            result_x_out, result_y_out, result_out = self(output_out, Y_out)
+            _, _, result_in = self(output_in)
+            _, _, result_out = self(output_out)
             correct = 0
-            correct += torch.sum((result_in == result_y_in))
-            correct += torch.sum((result_out == result_y_out))
+            correct += torch.sum((result_in > 0.5)).cpu().numpy()
+            correct += torch.sum((result_out < 0.5)).cpu().numpy()
             print(
                 "acc : {:.2f}".format(correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
         else:
