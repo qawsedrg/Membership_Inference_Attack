@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as transforms
+from cleverhans.torch.attacks.hop_skip_jump_attack import hop_skip_jump_attack
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -73,6 +74,7 @@ class ConfidenceVector():
                 return X, Y, self.attack_models[0](X)
 
     def show(self):
+        # todo
         data_in = torch.sort(self.shadowdata.data_in, dim=-1)[0][:, -self.topx:].cpu()
         data_out = torch.sort(self.shadowdata.data_out, dim=-1)[0][:, -self.topx:].cpu()
         attack_model = self.attack_models[0]
@@ -89,7 +91,7 @@ class ConfidenceVector():
                 x1.shape)
         x1, y1 = np.meshgrid(xp, yp)
         z = np.argmax((y_pred > 0.5).astype(int), axis=-1) / 100
-        ax.contour3D(x1, y1, z)
+        ax.contourf(x1, y1, z)
 
         ax.scatter3D(data_out[:, 0], data_out[:, 1], data_out[:, 2], marker='^', label="Not Trained")
         ax.scatter3D(data_in[:, 0], data_in[:, 1], data_in[:, 2], marker='o', label="Trained")
@@ -112,9 +114,9 @@ class ConfidenceVector():
                     [transforms.ToTensor(),
                      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
                 target.to(self.device)
-                loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=True)
+                loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=False)
                 output_in = forward(target, loader, self.device)
-                loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=True)
+                loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=False)
                 output_out = forward(target, loader, self.device)
                 _, _, result_in = self(F.softmax(output_in, dim=-1))
                 _, _, result_out = self(F.softmax(output_out, dim=-1))
@@ -129,10 +131,10 @@ class ConfidenceVector():
                     [transforms.ToTensor(),
                      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
                 target.to(self.device)
-                loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=True)
+                loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=False)
                 output_in = forward(target, loader, self.device)
                 output_in = torch.sort(output_in, dim=-1)[0][:, -self.topx:]
-                loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=True)
+                loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=False)
                 output_out = forward(target, loader, self.device)
                 output_out = torch.sort(output_out, dim=-1)[0][:, -self.topx:]
                 _, _, result_in = self(F.softmax(output_in, dim=-1))
@@ -154,7 +156,7 @@ class ConfidenceVector():
                         self.device)
                     attack_model = self.attack_models[i]
                     attack_model.to(self.device)
-                    loader = DataLoader(trainset(train_x, train_y), batch_size=64, shuffle=True)
+                    loader = DataLoader(trainset(train_x, train_y), batch_size=64, shuffle=False)
                     for data in loader:
                         with torch.no_grad():
                             correct += torch.sum((attack_model(data[0]) > 0.5).float() == data[1]).cpu().numpy()
@@ -170,7 +172,7 @@ class ConfidenceVector():
                     self.device)
                 attack_model = self.attack_models[0]
                 attack_model.to(self.device)
-                loader = DataLoader(trainset(train_x, train_y), batch_size=64, shuffle=True)
+                loader = DataLoader(trainset(train_x, train_y), batch_size=64, shuffle=False)
                 for data in loader:
                     with torch.no_grad():
                         correct += torch.sum((attack_model(data[0]) > 0.5).float() == data[1]).cpu().numpy()
@@ -180,5 +182,36 @@ class ConfidenceVector():
 
 
 class BoundaryDistance():
-    def __init__(self):
-        pass
+    def __init__(self, shadowmodel: ShadowModels, epoches: int, device: torch.device, topx: Optional[int] = -1):
+        self.shadowmodel = shadowmodel
+        self.shadowdata = shadowmodel.data
+        self.n_classes = int(max(torch.max(self.shadowdata.target_in).cpu().numpy(),
+                                 torch.max(self.shadowdata.target_out).cpu().numpy()) + 1)
+        self.topx = topx
+        self.epoches = epoches
+        self.device = device
+        self.max_samples = 5000
+
+    def train(self):
+        dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.max_samples,
+                                         self.device)
+        dist_shadow_in = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.max_samples,
+                                         self.device)
+
+    @staticmethod
+    def train_base(loader, model, max_samples, device):
+        dist_adv = []
+        num_samples = 0
+        model.to(device)
+        for i, data in enumerate(loader):
+            xbatch, ybatch = data[0].to(device), data[1].to(device)
+            with torch.no_grad():
+                y_pred = F.softmax(model(xbatch), dim=-1)
+            x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :][:2, :]
+            x_adv_curr = hop_skip_jump_attack(model, x_selected, 2)
+            d = torch.sqrt(torch.sum(torch.square(x_adv_curr - x_selected), dim=(1, 2, 3))).cpu().numpy()
+            dist_adv.extend(d)
+            num_samples += len(xbatch)
+            if num_samples > max_samples:
+                break
+        return dist_adv[:max_samples]
