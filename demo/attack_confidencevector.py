@@ -16,9 +16,9 @@ from model import CIFAR
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='cifar10', type=str)
-parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=10, type=int)
+parser.add_argument("--name", default='cifar100', type=str)
+parser.add_argument("--shadow_num", default=2, type=int)
+parser.add_argument("--shadow_nepoch", default=30, type=int)
 parser.add_argument("--attack_nepoch", default=5, type=int)
 parser.add_argument("--topx", default=3, type=int)
 
@@ -26,18 +26,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = CIFAR(10)
+    net = CIFAR(100)
     net.to(device)
 
-    target = CIFAR(10)
+    target = CIFAR(100)
     target.to(device)
     target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
     # todo: should be repalced by a hill-climbing and GAN
-    train = torchvision.datasets.CIFAR10(root='../data', train=True,
+    train = torchvision.datasets.CIFAR100(root='../data', train=True,
+                                          download=True)
+    test = torchvision.datasets.CIFAR100(root='../data', train=False,
                                          download=True)
-    test = torchvision.datasets.CIFAR10(root='../data', train=False,
-                                        download=True)
     X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
@@ -46,6 +46,7 @@ if __name__ == "__main__":
 
     attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
+    attack_model.show()
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 

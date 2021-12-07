@@ -34,7 +34,13 @@ def train(model, loader, device, optimizer, criterion, epoches):
 
                 optimizer.zero_grad()
                 outputs = model(inputs)
-                correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                if len(outputs.shape) == 2:
+                    correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                elif len(outputs.shape) == 1:
+                    correct_items += torch.sum(outputs[labels == 1] > .5).item()
+                    correct_items += torch.sum(outputs[labels == 0] < .5).item()
+                else:
+                    raise
                 acc_batch = correct_items / loader.batch_size
                 acc += acc_batch
                 loss = criterion(outputs, labels)

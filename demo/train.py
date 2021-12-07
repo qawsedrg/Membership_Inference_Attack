@@ -18,22 +18,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='cifar10', type=str)
+parser.add_argument("--name", default='cifar100', type=str)
 
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = CIFAR(10)
+    net = CIFAR(100)
     net.to(device)
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    train = torchvision.datasets.CIFAR10(root='../data', train=True,
+    train = torchvision.datasets.CIFAR100(root='../data', train=True,
+                                          download=True)
+    test = torchvision.datasets.CIFAR100(root='../data', train=False,
                                          download=True)
-    test = torchvision.datasets.CIFAR10(root='../data', train=False,
-                                        download=True)
     X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,

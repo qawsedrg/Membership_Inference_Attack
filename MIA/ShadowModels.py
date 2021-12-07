@@ -1,5 +1,5 @@
-import numpy as np
 import torch
+import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
@@ -44,7 +44,9 @@ class ShadowModels:
                                          shuffle=False)
                 X_in = torch.cat((X_in, forward(model, loader_train, self.device)), dim=0)
                 X_out = torch.cat((X_out, forward(model, loader_test, self.device)), dim=0)
-                Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
-                Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
+                # Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
+                # Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
+                Y_in = torch.cat((Y_in, torch.argmax(X_in, dim=-1)), dim=0)
+                Y_out = torch.cat((Y_out, torch.argmax(X_out, dim=-1)), dim=0)
 
-        self.data = DataStruct(X_in, X_out, Y_in, Y_out)
+        self.data = DataStruct(F.softmax(X_in, dim=-1), F.softmax(X_out, dim=-1), Y_in, Y_out)
