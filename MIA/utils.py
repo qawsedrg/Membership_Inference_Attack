@@ -1,5 +1,9 @@
+import numpy as np
 import torch
 import torch.nn.functional as F
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import roc_curve
 from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -86,3 +90,20 @@ class attackmodel(nn.Module):
         x = F.relu(self.fc1(x))
         x = torch.squeeze(nn.Sigmoid()(self.fc2(x)), dim=-1)
         return x
+
+
+def get_threshold(membership, vec, thresholds=None):
+    if thresholds is None:
+        fpr, tpr, thresholds = roc_curve(membership, vec)
+    accuracy_scores = []
+    precision_scores = []
+    for thresh in thresholds:
+        accuracy_scores.append(accuracy_score(membership, (vec > thresh).astype(int)))
+        precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
+    accuracies = np.array(accuracy_scores)
+    precisions = np.array(precision_scores)
+    max_accuracy = accuracies.max()
+    max_precision = precisions.max()
+    max_accuracy_threshold = thresholds[accuracies.argmax()]
+    max_precision_threshold = thresholds[precisions.argmax()]
+    return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold

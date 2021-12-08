@@ -1,3 +1,4 @@
+import pickle
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -11,7 +12,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from MIA.ShadowModels import ShadowModels
-from MIA.utils import trainset, train, attackmodel, forward
+from MIA.utils import trainset, train, attackmodel, forward, get_threshold
 
 
 class ConfidenceVector():
@@ -191,12 +192,20 @@ class BoundaryDistance():
         self.epoches = epoches
         self.device = device
         self.max_samples = 5000
+        self.acc_thresh = 0
+        self.pre_thresh = 0
 
     def train(self):
         dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.max_samples,
                                          self.device)
-        dist_shadow_in = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.max_samples,
-                                         self.device)
+        dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.max_samples,
+                                          self.device)
+        dist_shadow = np.concatenate((dist_shadow_in, dist_shadow_out))
+        membership_shadow = np.concatenate((np.ones_like(dist_shadow_in), np.zeros_like(dist_shadow_out)))
+        pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
+        pickle.dump(dist_shadow_out, open("./dist_shadow_out", "wb"))
+        acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, dist_shadow)
+        print("train_acc:{:},train_pre:{:}".format(acc, prec))
 
     @staticmethod
     def train_base(loader, model, max_samples, device):
@@ -204,10 +213,11 @@ class BoundaryDistance():
         num_samples = 0
         model.to(device)
         for i, data in enumerate(loader):
+            # todo 分类错误为0
             xbatch, ybatch = data[0].to(device), data[1].to(device)
             with torch.no_grad():
                 y_pred = F.softmax(model(xbatch), dim=-1)
-            x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :][:2, :]
+            x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
             x_adv_curr = hop_skip_jump_attack(model, x_selected, 2)
             d = torch.sqrt(torch.sum(torch.square(x_adv_curr - x_selected), dim=(1, 2, 3))).cpu().numpy()
             dist_adv.extend(d)
@@ -215,3 +225,19 @@ class BoundaryDistance():
             if num_samples > max_samples:
                 break
         return dist_adv[:max_samples]
+
+    def __call__(self, model, X: torch.Tensor, Y: Optional[torch.Tensor] = None):
+        x_adv_curr = hop_skip_jump_attack(model, X, 2)
+        d = torch.sqrt(torch.sum(torch.square(x_adv_curr - X), dim=(1, 2, 3))).cpu().numpy()
+        return X, Y, d > self.acc_thresh
+
+    def evaluate(self, target, loader_in, loader_out):
+        dist_target_in = self.train_base(loader_in, target, self.max_samples, self.device)
+        dist_target_out = self.train_base(loader_out, target, self.max_samples, self.device)
+        dist_target = np.concatenate((dist_target_in, dist_target_out))
+        membership_target = np.concatenate((np.ones_like(dist_target_in), np.zeros_like(dist_target_out)))
+        pickle.dump(dist_target_in, open("./dist_target_in", "wb"))
+        pickle.dump(dist_target_out, open("./dist_target_out", "wb"))
+        acc, _, _, _ = get_threshold(membership_target, dist_target, self.acc_thresh)
+        _, _, prec, _ = get_threshold(membership_target, dist_target, self.pre_thresh)
+        print("train_acc:{:},train_pre:{:}".format(acc, prec))
