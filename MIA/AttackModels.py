@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as transforms
 from cleverhans.torch.attacks.hop_skip_jump_attack import hop_skip_jump_attack
+from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -24,7 +25,7 @@ class ConfidenceVector():
         self.epoches = epoches
         self.device = device
 
-    def train(self):
+    def train(self, show=False):
         self.attack_models = []
         if self.topx == -1:
             for i in range(self.n_classes):
@@ -41,6 +42,31 @@ class ConfidenceVector():
                 attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                      epoches=self.epoches)
                 self.attack_models.append(attack_model)
+                fig = plt.figure()
+                if show:
+                    train_x_in = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
+                    train_x_out = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
+                    X_in_tsne = TSNE(n_components=2).fit_transform(train_x_in)
+                    X_out_tsne = TSNE(n_components=2).fit_transform(train_x_out)
+
+                    ax = fig.add_subplot()
+
+                    axes = [-50, 50, -50, 50]
+                    xp = np.linspace(axes[0], axes[1], 300)
+                    yp = np.linspace(axes[2], axes[3], 300)
+                    x1, y1 = np.meshgrid(xp, yp)
+                    xy = np.c_[x1.ravel(), y1.ravel()]
+                    y_pred = attack_model.predict(xy).reshape(x1.shape)
+                    plt.contourf(x1, y1, y_pred, alpha=0.3)
+
+                    ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
+                    ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
+
+                    ax.set_xlabel('X_{:} Label'.format(i))
+                    ax.set_ylabel('Y_{:} Label'.format(i))
+                    ax.legend()
+
+                    plt.show()
         else:
             train_x = torch.sort(torch.cat((self.shadowdata.data_in, self.shadowdata.data_out), dim=0), dim=-1)[0][:,
                       -self.topx:].to(self.device)
