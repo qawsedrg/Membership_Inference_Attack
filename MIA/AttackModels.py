@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-import torchvision.transforms as transforms
+import torchvision.transforms as T
 from cleverhans.torch.attacks.hop_skip_jump_attack import hop_skip_jump_attack
 from sklearn.manifold import TSNE
 from torch import nn
@@ -73,7 +73,6 @@ class ConfidenceVector():
             attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                  epoches=self.epoches)
             self.attack_models.append(attack_model)
-            fig = plt.figure()
 
     def __call__(self, X: torch.Tensor, Y: Optional[torch.Tensor] = None):
         if self.topx == -1:
@@ -131,9 +130,9 @@ class ConfidenceVector():
 
         if target is not None:
             if self.topx == -1:
-                transform = transforms.Compose(
-                    [transforms.ToTensor(),
-                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+                transform = T.Compose(
+                    [T.ToTensor(),
+                     T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
                 target.to(self.device)
                 loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=False)
                 output_in = forward(target, loader, self.device)
@@ -148,9 +147,9 @@ class ConfidenceVector():
                     "acc : {:.2f}".format(
                         correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
             else:
-                transform = transforms.Compose(
-                    [transforms.ToTensor(),
-                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+                transform = T.Compose(
+                    [T.ToTensor(),
+                     T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
                 target.to(self.device)
                 loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=False)
                 output_in = forward(target, loader, self.device)
@@ -212,6 +211,7 @@ class BoundaryDistance():
 
     def train(self):
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
+            # todo many shadow models
             dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0],
                                              self.device, self.max_samples)
             dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0],
@@ -255,9 +255,9 @@ class BoundaryDistance():
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
         if not os.path.exists("./dist_target_in") or not os.path.exists("./dist_target_out"):
-            transform = transforms.Compose(
-                [transforms.ToTensor(),
-                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            transform = T.Compose(
+                [T.ToTensor(),
+                 T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
             loader_in = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
             loader_out = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
             dist_target_in = self.train_base(loader_in, target, self.device, self.max_samples)
@@ -275,11 +275,40 @@ class BoundaryDistance():
 
 
 class Augmentation():
-    def __init__(self):
-        pass
+    def __init__(self, shadowmodel: ShadowModels, device: torch.device):
+        self.shadowmodel = shadowmodel
+        self.shadowdata = shadowmodel.data
+        self.device = device
+        # RandAugment ?
+        self.trans = [T.RandomRotation(10), T.ColorJitter(brightness=.5, hue=.3),
+                      T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
+        self.times = [3, 3, 3]
 
     def train(self):
-        pass
+        # todo when there are several shadowmodels
+        model = self.shadowmodel[0]
+        # 需要保证所有数据都用同一个变换吗，还是同一组就行
+        data_x_in = self.train_base(model, self.shadowmodel.loader_train)
+        data_x_out = self.train_base(model, self.shadowmodel.loader_test)
+        data_x = torch.cat((data_x_in, data_x_out), dim=0)
+        data_y = torch.cat((torch.ones(data_x_in.shape[0]), torch.zeros(data_x_out.shape[0]))).to(self.device)
+
+    def train_base(self, model, loader):
+        # total*sum(times)
+        data = torch.Tensor().to(self.device)
+        for i, tran in enumerate(self.trans):
+            for j in range(self.times[i]):
+                torch.manual_seed(i * j)
+                data_one_step = torch.Tensor().to(self.device)
+                tran.to(self.device)
+                model.to(self.device)
+                for i, data in enumerate(loader):
+                    xbatch, ybatch = tran(data[0].to(self.device)), data[1].to(self.device)
+                    with torch.no_grad():
+                        y_pred = F.softmax(model(xbatch), dim=-1)
+                    data_one_step = torch.cat((data_one_step, torch.argmax(y_pred, dim=-1) == ybatch), dim=0)
+                data = torch.cat((data, data_one_step), dim=-1)
+        return data
 
     def evaluate(self):
         pass
