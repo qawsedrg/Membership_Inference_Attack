@@ -312,6 +312,7 @@ class Augmentation():
 
     def evaluate(self):
         pass
+    pass
 
     def __call__(self):
         pass
