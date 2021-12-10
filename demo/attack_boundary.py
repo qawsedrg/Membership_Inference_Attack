@@ -7,14 +7,13 @@ import torchvision
 from sklearn.model_selection import train_test_split
 
 from MIA.AttackModels import BoundaryDistance
-from MIA.ShadowModels import ShadowModels
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar100', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=10, type=int)
+parser.add_argument("--shadow_nepoch", default=30, type=int)
 parser.add_argument("--attack_nepoch", default=1, type=int)
 parser.add_argument("--topx", default=-1, type=int)
 
@@ -37,8 +36,25 @@ if __name__ == "__main__":
     X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
-    shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
-    shadow_models.train()
+    # shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
+    # shadow_models.train()
 
-    attack_model = BoundaryDistance(shadow_models, args.attack_nepoch, device, args.topx)
+    attack_model = BoundaryDistance(None, device)
     attack_model.train()
+
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    loader = DataLoader(trainset(target_X, transform=transform), batch_size=1024, shuffle=False)
+    membership = torch.Tensor().to(device)
+    confidence_vectors = torch.Tensor().to(device)
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            data = F.softmax(net(data), dim=-1)
+            if args.topx != -1:
+                data = torch.sort(data, dim=-1)[0][:, -args.topx:]
+            result = attack_model(data)
+            membership = torch.cat((membership, result[2]), dim=0)
+            confidence_vectors = torch.cat((confidence_vectors, result[0]), dim=0)
+    print("fini")

@@ -17,10 +17,10 @@ from model import CIFAR
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar100', type=str)
-parser.add_argument("--shadow_num", default=2, type=int)
-parser.add_argument("--shadow_nepoch", default=30, type=int)
+parser.add_argument("--shadow_num", default=1, type=int)
+parser.add_argument("--shadow_nepoch", default=10, type=int)
 parser.add_argument("--attack_nepoch", default=5, type=int)
-parser.add_argument("--topx", default=3, type=int)
+parser.add_argument("--topx", default=-1, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     shadow_models.train()
 
     attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
-    attack_model.train()
+    attack_model.train(show=True)
     # attack_model.show()
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))

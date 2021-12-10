@@ -1,3 +1,4 @@
+import os.path
 import pickle
 from typing import Optional
 
@@ -51,14 +52,6 @@ class ConfidenceVector():
 
                     ax = fig.add_subplot()
 
-                    axes = [-50, 50, -50, 50]
-                    xp = np.linspace(axes[0], axes[1], 300)
-                    yp = np.linspace(axes[2], axes[3], 300)
-                    x1, y1 = np.meshgrid(xp, yp)
-                    xy = np.c_[x1.ravel(), y1.ravel()]
-                    y_pred = attack_model.predict(xy).reshape(x1.shape)
-                    plt.contourf(x1, y1, y_pred, alpha=0.3)
-
                     ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
                     ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
 
@@ -80,6 +73,7 @@ class ConfidenceVector():
             attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                  epoches=self.epoches)
             self.attack_models.append(attack_model)
+            fig = plt.figure()
 
     def __call__(self, X: torch.Tensor, Y: Optional[torch.Tensor] = None):
         if self.topx == -1:
@@ -209,27 +203,26 @@ class ConfidenceVector():
 
 
 class BoundaryDistance():
-    def __init__(self, shadowmodel: ShadowModels, epoches: int, device: torch.device, topx: Optional[int] = -1):
+    def __init__(self, shadowmodel: ShadowModels, device: torch.device):
         self.shadowmodel = shadowmodel
-        self.shadowdata = shadowmodel.data
-        self.n_classes = int(max(torch.max(self.shadowdata.target_in).cpu().numpy(),
-                                 torch.max(self.shadowdata.target_out).cpu().numpy()) + 1)
-        self.topx = topx
-        self.epoches = epoches
         self.device = device
         self.max_samples = 5000
         self.acc_thresh = 0
         self.pre_thresh = 0
 
     def train(self):
-        dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.max_samples,
-                                         self.device)
-        dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.max_samples,
-                                          self.device)
+        if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
+            dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.max_samples,
+                                             self.device)
+            dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.max_samples,
+                                              self.device)
+            pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
+            pickle.dump(dist_shadow_out, open("./dist_shadow_out", "wb"))
+        else:
+            dist_shadow_in = pickle.load(open("./dist_shadow_in", "rb"))
+            dist_shadow_out = pickle.load(open("./dist_shadow_out", "rb"))
         dist_shadow = np.concatenate((dist_shadow_in, dist_shadow_out))
         membership_shadow = np.concatenate((np.ones_like(dist_shadow_in), np.zeros_like(dist_shadow_out)))
-        pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
-        pickle.dump(dist_shadow_out, open("./dist_shadow_out", "wb"))
         acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, dist_shadow)
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
 
@@ -267,3 +260,17 @@ class BoundaryDistance():
         acc, _, _, _ = get_threshold(membership_target, dist_target, self.acc_thresh)
         _, _, prec, _ = get_threshold(membership_target, dist_target, self.pre_thresh)
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
+
+
+class Augmentation():
+    def __init__(self):
+        pass
+
+    def train(self):
+        pass
+
+    def evaluate(self):
+        pass
+
+    def __call__(self):
+        pass
