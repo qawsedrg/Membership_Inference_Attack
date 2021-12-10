@@ -93,17 +93,25 @@ class attackmodel(nn.Module):
 
 
 def get_threshold(membership, vec, thresholds=None):
-    if thresholds is None:
-        fpr, tpr, thresholds = roc_curve(membership, vec)
     accuracy_scores = []
     precision_scores = []
-    for thresh in thresholds:
-        accuracy_scores.append(accuracy_score(membership, (vec > thresh).astype(int)))
-        precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
-    accuracies = np.array(accuracy_scores)
-    precisions = np.array(precision_scores)
-    max_accuracy = accuracies.max()
-    max_precision = precisions.max()
-    max_accuracy_threshold = thresholds[accuracies.argmax()]
-    max_precision_threshold = thresholds[precisions.argmax()]
-    return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold
+    if thresholds is None:
+        fpr, tpr, thresholds = roc_curve(membership, vec)
+        for thresh in thresholds:
+            accuracy_scores.append(accuracy_score(membership, (vec > thresh).astype(int)))
+            precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
+            accuracies = np.array(accuracy_scores)
+            precisions = np.array(precision_scores)
+            max_accuracy = accuracies.max()
+            max_precision = precisions.max()
+            max_accuracy_threshold = thresholds[accuracies.argmax()]
+            max_precision_threshold = thresholds[precisions.argmax()]
+            return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold
+    else:
+        accuracy_scores.append(accuracy_score(membership, (vec > thresholds).astype(int)))
+        precision_scores.append(precision_score(membership, (vec > thresholds).astype(int)))
+        accuracies = np.array(accuracy_scores)
+        precisions = np.array(precision_scores)
+        max_accuracy = accuracies.max()
+        max_precision = precisions.max()
+        return max_accuracy, None, max_precision, None

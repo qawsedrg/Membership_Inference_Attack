@@ -212,10 +212,10 @@ class BoundaryDistance():
 
     def train(self):
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
-            dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.max_samples,
-                                             self.device)
-            dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.max_samples,
-                                              self.device)
+            dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0],
+                                             self.device, self.max_samples)
+            dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0],
+                                              self.device, self.max_samples)
             pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
             pickle.dump(dist_shadow_out, open("./dist_shadow_out", "wb"))
         else:
@@ -227,7 +227,7 @@ class BoundaryDistance():
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
 
     @staticmethod
-    def train_base(loader, model, max_samples, device):
+    def train_base(loader, model, device, max_samples=-1):
         dist_adv = []
         num_samples = 0
         model.to(device)
@@ -245,21 +245,33 @@ class BoundaryDistance():
                 break
         return dist_adv[:max_samples]
 
-    def __call__(self, model, X: torch.Tensor, Y: Optional[torch.Tensor] = None):
+    def __call__(self, model, X: torch.Tensor):
         x_adv_curr = hop_skip_jump_attack(model, X, 2)
         d = torch.sqrt(torch.sum(torch.square(x_adv_curr - X), dim=(1, 2, 3))).cpu().numpy()
-        return X, Y, d > self.acc_thresh
+        return d > self.acc_thresh
 
-    def evaluate(self, target, loader_in, loader_out):
-        dist_target_in = self.train_base(loader_in, target, self.max_samples, self.device)
-        dist_target_out = self.train_base(loader_out, target, self.max_samples, self.device)
+    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+                 X_out: Optional[np.ndarray] = None,
+                 Y_in: Optional[np.ndarray] = None,
+                 Y_out: Optional[np.ndarray] = None):
+        if not os.path.exists("./dist_target_in") or not os.path.exists("./dist_target_out"):
+            transform = transforms.Compose(
+                [transforms.ToTensor(),
+                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            loader_in = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
+            loader_out = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
+            dist_target_in = self.train_base(loader_in, target, self.device, self.max_samples)
+            dist_target_out = self.train_base(loader_out, target, self.device, self.max_samples)
+            pickle.dump(dist_target_in, open("./dist_target_in", "wb"))
+            pickle.dump(dist_target_out, open("./dist_target_out", "wb"))
+        else:
+            dist_target_in = pickle.load(open("./dist_target_in", "rb"))
+            dist_target_out = pickle.load(open("./dist_target_out", "rb"))
         dist_target = np.concatenate((dist_target_in, dist_target_out))
         membership_target = np.concatenate((np.ones_like(dist_target_in), np.zeros_like(dist_target_out)))
-        pickle.dump(dist_target_in, open("./dist_target_in", "wb"))
-        pickle.dump(dist_target_out, open("./dist_target_out", "wb"))
         acc, _, _, _ = get_threshold(membership_target, dist_target, self.acc_thresh)
         _, _, prec, _ = get_threshold(membership_target, dist_target, self.pre_thresh)
-        print("train_acc:{:},train_pre:{:}".format(acc, prec))
+        print("test_acc:{:},test_pre:{:}".format(acc, prec))
 
 
 class Augmentation():

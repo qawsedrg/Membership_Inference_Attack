@@ -4,9 +4,12 @@ import os.path
 import numpy as np
 import torch
 import torchvision
+import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
 
 from MIA.AttackModels import BoundaryDistance
+from MIA.utils import trainset
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
@@ -14,8 +17,6 @@ parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar100', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
 parser.add_argument("--shadow_nepoch", default=30, type=int)
-parser.add_argument("--attack_nepoch", default=1, type=int)
-parser.add_argument("--topx", default=-1, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -41,20 +42,16 @@ if __name__ == "__main__":
 
     attack_model = BoundaryDistance(None, device)
     attack_model.train()
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    loader = DataLoader(trainset(target_X, transform=transform), batch_size=1024, shuffle=False)
-    membership = torch.Tensor().to(device)
-    confidence_vectors = torch.Tensor().to(device)
+    loader = DataLoader(trainset(target_X, transform=transform), batch_size=1, shuffle=False)
+    membership = np.array([])
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
-            data = F.softmax(net(data), dim=-1)
-            if args.topx != -1:
-                data = torch.sort(data, dim=-1)[0][:, -args.topx:]
-            result = attack_model(data)
-            membership = torch.cat((membership, result[2]), dim=0)
-            confidence_vectors = torch.cat((confidence_vectors, result[0]), dim=0)
+            result = attack_model(target, data)
+            membership = np.concatenate((membership, result), axis=0)
     print("fini")

@@ -59,7 +59,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
-            data = F.softmax(net(data), dim=-1)
+            data = F.softmax(target(data), dim=-1)
             if args.topx != -1:
                 data = torch.sort(data, dim=-1)[0][:, -args.topx:]
             result = attack_model(data)
