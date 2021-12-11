@@ -1,6 +1,7 @@
 import os.path
 import pickle
 from typing import Optional
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +10,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as T
 from cleverhans.torch.attacks.hop_skip_jump_attack import hop_skip_jump_attack
+from cleverhans.torch.attacks.carlini_wagner_l2 import carlini_wagner_l2
 from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils.data import DataLoader
@@ -202,10 +204,10 @@ class ConfidenceVector():
 
 
 class BoundaryDistance():
+    # todo
     def __init__(self, shadowmodel: ShadowModels, device: torch.device):
         self.shadowmodel = shadowmodel
         self.device = device
-        self.max_samples = 5000
         self.acc_thresh = 0
         self.pre_thresh = 0
 
@@ -213,9 +215,9 @@ class BoundaryDistance():
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
             # todo many shadow models
             dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0],
-                                             self.device, self.max_samples)
+                                             self.device)
             dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0],
-                                              self.device, self.max_samples)
+                                              self.device)
             pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
             pickle.dump(dist_shadow_out, open("./dist_shadow_out", "wb"))
         else:
@@ -227,23 +229,22 @@ class BoundaryDistance():
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
 
     @staticmethod
-    def train_base(loader, model, device, max_samples=-1):
+    def train_base(loader, model, device):
         dist_adv = []
-        num_samples = 0
         model.to(device)
-        for i, data in enumerate(loader):
-            # todo 分类错误为0
-            xbatch, ybatch = data[0].to(device), data[1].to(device)
-            with torch.no_grad():
-                y_pred = F.softmax(model(xbatch), dim=-1)
-            x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
-            x_adv_curr = hop_skip_jump_attack(model, x_selected, 2)
-            d = torch.sqrt(torch.sum(torch.square(x_adv_curr - x_selected), dim=(1, 2, 3))).cpu().numpy()
-            dist_adv.extend(d)
-            num_samples += len(xbatch)
-            if num_samples > max_samples:
-                break
-        return dist_adv[:max_samples]
+        with tqdm(enumerate(loader, 0), total=len(loader)) as t:
+            for i, data in t:
+                xbatch, ybatch = data[0].to(device), data[1].to(device)
+                with torch.no_grad():
+                    y_pred = F.softmax(model(xbatch), dim=-1)
+                x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
+                dist_adv.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
+                # num_iteration
+                x_adv_curr = hop_skip_jump_attack(model, x_selected, 2, num_iterations=1, verbose=0)
+                # x_adv_curr = carlini_wagner_l2(model, x_selected,n_classes=100)
+                d = torch.sqrt(torch.sum(torch.square(x_adv_curr - x_selected), dim=(1, 2, 3))).cpu().numpy()
+                dist_adv.extend(d)
+        return dist_adv
 
     def __call__(self, model, X: torch.Tensor):
         x_adv_curr = hop_skip_jump_attack(model, X, 2)
@@ -260,8 +261,8 @@ class BoundaryDistance():
                  T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
             loader_in = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
             loader_out = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
-            dist_target_in = self.train_base(loader_in, target, self.device, self.max_samples)
-            dist_target_out = self.train_base(loader_out, target, self.device, self.max_samples)
+            dist_target_in = self.train_base(loader_in, target, self.device)
+            dist_target_out = self.train_base(loader_out, target, self.device)
             pickle.dump(dist_target_in, open("./dist_target_in", "wb"))
             pickle.dump(dist_target_out, open("./dist_target_out", "wb"))
         else:
@@ -287,7 +288,7 @@ class Augmentation():
     def train(self):
         # todo when there are several shadowmodels
         model = self.shadowmodel[0]
-        # 需要保证所有数据都用同一个变换吗，还是同一组就行
+        # 需要保证所有数据都用同一个变换吗，还是同一类型就行
         data_x_in = self.train_base(model, self.shadowmodel.loader_train)
         data_x_out = self.train_base(model, self.shadowmodel.loader_test)
         data_x = torch.cat((data_x_in, data_x_out), dim=0)
@@ -295,20 +296,22 @@ class Augmentation():
 
     def train_base(self, model, loader):
         # total*sum(times)
-        data = torch.Tensor().to(self.device)
+        result = torch.Tensor().to(self.device)
         for i, tran in enumerate(self.trans):
             for j in range(self.times[i]):
                 torch.manual_seed(i * j)
                 data_one_step = torch.Tensor().to(self.device)
                 tran.to(self.device)
                 model.to(self.device)
-                for i, data in enumerate(loader):
-                    xbatch, ybatch = tran(data[0].to(self.device)), data[1].to(self.device)
-                    with torch.no_grad():
-                        y_pred = F.softmax(model(xbatch), dim=-1)
-                    data_one_step = torch.cat((data_one_step, torch.argmax(y_pred, dim=-1) == ybatch), dim=0)
-                data = torch.cat((data, data_one_step), dim=-1)
-        return data
+                with tqdm(enumerate(loader, 0), total=len(loader)) as t:
+                    for i, data in t:
+                        xbatch, ybatch = tran(data[0].to(self.device)), data[1].to(self.device)
+                        with torch.no_grad():
+                            y_pred = F.softmax(model(xbatch), dim=-1)
+                        data_one_step = torch.cat((data_one_step, torch.argmax(y_pred, dim=-1) == ybatch), dim=0)
+                    t.set_description("Transformation {:}|{:}".format(i, j))
+                result = torch.cat((result, data_one_step), dim=-1)
+        return result
 
     def evaluate(self):
         pass

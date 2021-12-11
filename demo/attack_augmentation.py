@@ -8,16 +8,16 @@ import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import BoundaryDistance
-from MIA.utils import trainset
+from MIA.AttackModels import Augmentation
 from MIA.ShadowModels import ShadowModels
+from MIA.utils import trainset
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar100', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=15, type=int)
+parser.add_argument("--shadow_nepoch", default=30, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -41,21 +41,5 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X[:5000, :], shadow_Y[:5000], args.shadow_nepoch, device)
     shadow_models.train()
 
-    attack_model = BoundaryDistance(shadow_models, device)
+    attack_model = Augmentation(shadow_models, device)
     attack_model.train()
-    attack_model.evaluate(target,
-                          *train_test_split(target_X[:5000, :], target_Y[:5000], test_size=0.5, random_state=42))
-
-    '''
-    transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    loader = DataLoader(trainset(target_X, transform=transform), batch_size=1, shuffle=False)
-    membership = np.array([])
-    with torch.no_grad():
-        for data in loader:
-            data = data.to(device)
-            result = attack_model(target, data)
-            membership = np.concatenate((membership, result), axis=0)
-    print("fini")
-    '''
