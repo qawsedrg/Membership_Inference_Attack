@@ -14,11 +14,12 @@ from cleverhans.torch.attacks.carlini_wagner_l2 import carlini_wagner_l2
 from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils.data import DataLoader
+from sklearn.cluster import KMeans
 
 from MIA.ShadowModels import ShadowModels
-from MIA.utils import trainset, train, attackmodel, forward, get_threshold
+from MIA.utils import trainset, train, attackmodel, forward, get_threshold, get_num_threshold
 
-
+# todo 统一接口
 class ConfidenceVector():
     def __init__(self, shadowmodel: ShadowModels, epoches: int, device: torch.device, topx: Optional[int] = -1):
         self.shadowdata = shadowmodel.data
@@ -45,8 +46,8 @@ class ConfidenceVector():
                 attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                      epoches=self.epoches)
                 self.attack_models.append(attack_model)
-                fig = plt.figure()
                 if show:
+                    fig = plt.figure()
                     train_x_in = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
                     train_x_out = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
                     X_in_tsne = TSNE(n_components=2).fit_transform(train_x_in)
@@ -276,23 +277,54 @@ class BoundaryDistance():
 
 
 class Augmentation():
-    def __init__(self, shadowmodel: ShadowModels, device: torch.device):
-        self.shadowmodel = shadowmodel
-        self.shadowdata = shadowmodel.data
+    def __init__(self, device: torch.device):
         self.device = device
         # RandAugment ?
         self.trans = [T.RandomRotation(10), T.ColorJitter(brightness=.5, hue=.3),
                       T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
         self.times = [3, 3, 3]
+        self.acc_thresh = 0
+        self.pre_thresh = 0
 
-    def train(self):
-        # todo when there are several shadowmodels
-        model = self.shadowmodel[0]
+    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+                 X_out: Optional[np.ndarray] = None,
+                 Y_in: Optional[np.ndarray] = None,
+                 Y_out: Optional[np.ndarray] = None,show=False):
         # 需要保证所有数据都用同一个变换吗，还是同一类型就行
-        data_x_in = self.train_base(model, self.shadowmodel.loader_train)
-        data_x_out = self.train_base(model, self.shadowmodel.loader_test)
-        data_x = torch.cat((data_x_in, data_x_out), dim=0)
-        data_y = torch.cat((torch.ones(data_x_in.shape[0]), torch.zeros(data_x_out.shape[0]))).to(self.device)
+        transform = T.Compose(
+            [T.ToTensor(),
+             T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        loader_train = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
+        loader_test = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
+        data_x_in = self.train_base(target, loader_train).cpu().numpy()
+        data_x_out = self.train_base(target, loader_test).cpu().numpy()
+        data_x = np.concatenate((data_x_in, data_x_out), axis=0)
+        data_y = np.concatenate((np.ones(data_x_in.shape[0]), np.zeros(data_x_out.shape[0])))
+        # 要改用监督学习吗，万一都是in，然后硬是分成两部分导致准确率低
+        kmeans = KMeans(n_clusters=2, random_state=0).fit(data_x)
+        acc = np.sum(kmeans.labels_ == data_y) / len(data_y)
+        if acc < 0.5:
+            data_y = 1 - data_y
+        acc = np.sum(kmeans.labels_ == data_y) / len(data_y)
+        prec = np.sum(
+            [(kmeans.labels_ == 1)[i] and (kmeans.labels_ == data_y)[i] for i in range(len(data_y))]) / np.sum(
+            kmeans.labels_)
+        print("train_acc:{:},train_pre:{:}".format(acc, prec))
+        if show:
+            fig = plt.figure()
+            X_in_tsne = TSNE(n_components=2).fit_transform(data_x_in)
+            X_out_tsne = TSNE(n_components=2).fit_transform(data_x_out)
+
+            ax = fig.add_subplot()
+
+            ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
+            ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
+
+            ax.set_xlabel('X Label')
+            ax.set_ylabel('Y Label')
+            ax.legend()
+
+            plt.show()
 
     def train_base(self, model, loader):
         # total*sum(times)
@@ -300,21 +332,24 @@ class Augmentation():
         for i, tran in enumerate(self.trans):
             for j in range(self.times[i]):
                 torch.manual_seed(i * j)
-                data_one_step = torch.Tensor().to(self.device)
+                result_one_step = torch.Tensor().to(self.device)
                 tran.to(self.device)
                 model.to(self.device)
-                with tqdm(enumerate(loader, 0), total=len(loader)) as t:
-                    for i, data in t:
+                with tqdm(loader, total=len(loader)) as t:
+                    t.set_description("Transformation {:}|{:}".format(i, j))
+                    for data in t:
                         xbatch, ybatch = tran(data[0].to(self.device)), data[1].to(self.device)
                         with torch.no_grad():
                             y_pred = F.softmax(model(xbatch), dim=-1)
-                        data_one_step = torch.cat((data_one_step, torch.argmax(y_pred, dim=-1) == ybatch), dim=0)
-                    t.set_description("Transformation {:}|{:}".format(i, j))
-                result = torch.cat((result, data_one_step), dim=-1)
+                        result_one_step = torch.cat((result_one_step, torch.argmax(y_pred, dim=-1) == ybatch), dim=0)
+                result = torch.cat((result, torch.unsqueeze(result_one_step, dim=-1)), dim=-1)
         return result
 
-    def evaluate(self):
-        pass
+    def __call__(self, model, X: np.ndarray,Y: np.ndarray):
+        transform = T.Compose(
+            [T.ToTensor(),
+             T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        loader=DataLoader(trainset(X, Y, transform), batch_size=64, shuffle=False)
+        out = self.train_base(model, loader).cpu().numpy()
+        return KMeans(n_clusters=2, random_state=0).fit(out).labels_
 
-    def __call__(self):
-        pass
