@@ -205,14 +205,14 @@ class ConfidenceVector():
 
 
 class BoundaryDistance():
-    # todo
+    # todo test correcteness
     def __init__(self, shadowmodel: ShadowModels, device: torch.device):
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
 
-    def train(self):
+    def train(self, show=False):
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
             # todo many shadow models
             dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0],
@@ -228,6 +228,11 @@ class BoundaryDistance():
         membership_shadow = np.concatenate((np.ones_like(dist_shadow_in), np.zeros_like(dist_shadow_out)))
         acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, dist_shadow)
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
+        if show:
+            plt.hist(dist_shadow_in, bins=100, range=[0, 2], label="in")
+            plt.hist(dist_shadow_out, bins=100, range=[0, 2], label="out")
+            plt.legend()
+            plt.show()
 
     @staticmethod
     def train_base(loader, model, device):
@@ -345,11 +350,24 @@ class Augmentation():
                 result = torch.cat((result, torch.unsqueeze(result_one_step, dim=-1)), dim=-1)
         return result
 
-    def __call__(self, model, X: np.ndarray,Y: np.ndarray):
+    def __call__(self, model, X: np.ndarray, Y: np.ndarray):
         transform = T.Compose(
             [T.ToTensor(),
              T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        loader=DataLoader(trainset(X, Y, transform), batch_size=64, shuffle=False)
+        loader = DataLoader(trainset(X, Y, transform), batch_size=64, shuffle=False)
         out = self.train_base(model, loader).cpu().numpy()
         return KMeans(n_clusters=2, random_state=0).fit(out).labels_
 
+
+class NoiseAttack():
+    def __init__(self):
+        pass
+
+    def train(self):
+        pass
+
+    def evaluate(self):
+        pass
+
+    def __call__(self):
+        pass

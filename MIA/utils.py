@@ -1,4 +1,3 @@
-import numpy
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -8,6 +7,8 @@ from sklearn.metrics import roc_curve
 from torch import nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
+from multiprocessing.pool import ThreadPool
+import multiprocessing
 
 
 class trainset(Dataset):
@@ -93,6 +94,7 @@ class attackmodel(nn.Module):
         return x
 
 
+'''
 def get_threshold(membership: numpy.array, vec: numpy.array, thresholds=None):
     accuracy_scores = []
     precision_scores = []
@@ -107,7 +109,7 @@ def get_threshold(membership: numpy.array, vec: numpy.array, thresholds=None):
             max_precision = precisions.max()
             max_accuracy_threshold = thresholds[accuracies.argmax()]
             max_precision_threshold = thresholds[precisions.argmax()]
-            return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold
+        return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold
     else:
         accuracy_scores.append(accuracy_score(membership, (vec > thresholds).astype(int)))
         precision_scores.append(precision_score(membership, (vec > thresholds).astype(int)))
@@ -120,3 +122,44 @@ def get_threshold(membership: numpy.array, vec: numpy.array, thresholds=None):
 
 def get_num_threshold(membership, vec, thresholds=None):
     pass
+'''
+
+
+def get_threshold(membership, vec, thresholds=None):
+    accuracy_scores = []
+    precision_scores = []
+    if thresholds is None:
+        def f(thresholds):
+            for thresh in tqdm(thresholds):
+                accuracy_scores.append(accuracy_score(membership, (vec > thresh).astype(int)))
+                precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
+                accuracies = np.array(accuracy_scores)
+                precisions = np.array(precision_scores)
+            return thresholds, accuracies, precisions
+
+        fpr, tpr, thresholds = roc_curve(membership, vec)
+        numberOfThreads = multiprocessing.cpu_count()
+        pool = ThreadPool(processes=numberOfThreads)
+        Chunks = np.array_split(thresholds, numberOfThreads)
+        results = pool.map_async(f, Chunks)
+        pool.close()
+        pool.join()
+        for result in results.get():
+            thresholds, accuracies, precisions = result
+            accuracy_scores.extend(accuracies)
+            precision_scores.extend(precisions)
+        accuracies = np.array(accuracy_scores)
+        precisions = np.array(precision_scores)
+        max_accuracy = accuracies.max()
+        max_precision = precisions.max()
+        max_accuracy_threshold = thresholds[accuracies.argmax()]
+        max_precision_threshold = thresholds[precisions.argmax()]
+        return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold
+    else:
+        accuracy_scores.append(accuracy_score(membership, (vec > thresholds).astype(int)))
+        precision_scores.append(precision_score(membership, (vec > thresholds).astype(int)))
+        accuracies = np.array(accuracy_scores)
+        precisions = np.array(precision_scores)
+        max_accuracy = accuracies.max()
+        max_precision = precisions.max()
+        return max_accuracy, None, max_precision, None
