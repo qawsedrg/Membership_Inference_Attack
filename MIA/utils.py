@@ -118,10 +118,6 @@ def get_threshold(membership: numpy.array, vec: numpy.array, thresholds=None):
         max_accuracy = accuracies.max()
         max_precision = precisions.max()
         return max_accuracy, None, max_precision, None
-
-
-def get_num_threshold(membership, vec, thresholds=None):
-    pass
 '''
 
 

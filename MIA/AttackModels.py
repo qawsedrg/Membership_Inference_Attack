@@ -15,9 +15,12 @@ from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils.data import DataLoader
 from sklearn.cluster import KMeans
+from sklearn.cluster import SpectralClustering
+from sklearn.cluster import DBSCAN
 
 from MIA.ShadowModels import ShadowModels
-from MIA.utils import trainset, train, attackmodel, forward, get_threshold, get_num_threshold
+from MIA.utils import trainset, train, attackmodel, forward, get_threshold
+
 
 # todo 统一接口
 class ConfidenceVector():
@@ -306,7 +309,10 @@ class Augmentation():
         data_x = np.concatenate((data_x_in, data_x_out), axis=0)
         data_y = np.concatenate((np.ones(data_x_in.shape[0]), np.zeros(data_x_out.shape[0])))
         # 要改用监督学习吗，万一都是in，然后硬是分成两部分导致准确率低
+        # 效果好吗？
         kmeans = KMeans(n_clusters=2, random_state=0).fit(data_x)
+        # kmeans=SpectralClustering(n_clusters=2, affinity='nearest_neighbors',
+        #                   assign_labels='kmeans').fit(data_x)
         acc = np.sum(kmeans.labels_ == data_y) / len(data_y)
         if acc < 0.5:
             data_y = 1 - data_y
@@ -322,8 +328,9 @@ class Augmentation():
 
             ax = fig.add_subplot()
 
-            ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
-            ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
+            ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], c=kmeans.labels_[:len(data_x_in)], marker='^',
+                       label="Not Trained")
+            ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], c=kmeans.labels_[len(data_x_in):], marker='o', label="Trained")
 
             ax.set_xlabel('X Label')
             ax.set_ylabel('Y Label')

@@ -32,5 +32,5 @@ if __name__ == "__main__":
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
     attack_model = Augmentation(device)
-    attack_model.evaluate(target,*train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
-    attack_model(target,target_X,target_Y)
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=True)
+    membership = attack_model(target, target_X, target_Y)
