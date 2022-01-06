@@ -131,7 +131,7 @@ def get_threshold(membership, vec, thresholds=None):
                 precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
                 accuracies = np.array(accuracy_scores)
                 precisions = np.array(precision_scores)
-            return thresholds, accuracies, precisions
+            return accuracies, precisions
 
         fpr, tpr, thresholds = roc_curve(membership, vec)
         numberOfThreads = multiprocessing.cpu_count()
@@ -141,7 +141,7 @@ def get_threshold(membership, vec, thresholds=None):
         pool.close()
         pool.join()
         for result in results.get():
-            thresholds, accuracies, precisions = result
+            accuracies, precisions = result
             accuracy_scores.extend(accuracies)
             precision_scores.extend(precisions)
         accuracies = np.array(accuracy_scores)

@@ -43,3 +43,17 @@ if __name__ == "__main__":
 
     attack_model = NoiseAttack(shadow_models, device)
     attack_model.train()
+    attack_model.evaluate(target,
+                          *train_test_split(target_X[:5000, :], target_Y[:5000], test_size=0.5, random_state=42))
+
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    loader = DataLoader(trainset(target_X[:1000, :], transform=transform), batch_size=100, shuffle=False)
+    membership = np.array([])
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            result = attack_model(target, data)
+            membership = np.concatenate((membership, result), axis=0)
+    print("fini")

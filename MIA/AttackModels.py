@@ -424,8 +424,44 @@ class NoiseAttack():
                     num_in.append(n / noise_samples)
         return num_in
 
-    def evaluate(self):
-        pass
+    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+                 X_out: Optional[np.ndarray] = None,
+                 Y_in: Optional[np.ndarray] = None,
+                 Y_out: Optional[np.ndarray] = None):
+        if not os.path.exists("./dist_target_in_noise") or not os.path.exists("./dist_target_out_noise"):
+            transform = T.Compose(
+                [T.ToTensor(),
+                 T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            loader_in = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
+            loader_out = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
+            dist_target_in = self.train_base(loader_in, target, self.stddev,
+                                             self.noisesamples
+                                             , self.device)
+            dist_target_out = self.train_base(loader_out, target, self.stddev,
+                                              self.noisesamples
+                                              , self.device)
+            pickle.dump(dist_target_in, open("./dist_target_in_noise", "wb"))
+            pickle.dump(dist_target_out, open("./dist_target_out_noise", "wb"))
+        else:
+            dist_target_in = pickle.load(open("./dist_target_in_noise", "rb"))
+            dist_target_out = pickle.load(open("./dist_target_out_noise", "rb"))
+        dist_target = np.concatenate((dist_target_in, dist_target_out))
+        membership_target = np.concatenate((np.ones_like(dist_target_in), np.zeros_like(dist_target_out)))
+        acc, _, _, _ = get_threshold(membership_target, dist_target, self.acc_thresh)
+        _, _, prec, _ = get_threshold(membership_target, dist_target, self.pre_thresh)
+        print("test_acc:{:},test_pre:{:}".format(acc, prec))
 
-    def __call__(self):
-        pass
+    def __call__(self, model, X: torch.Tensor):
+        y = F.softmax(model(X), dim=-1)
+        num_in = []
+        for i in range(X.shape[0]):
+            noise = torch.from_numpy(self.stddev * np.random.randn(self.noisesamples, *X.shape[1:])).to(self.device)
+            x_noisy = torch.clamp(X[i] + noise, 0, 1).float()
+            b_size = 100
+            n = 0
+            with torch.no_grad():
+                for j in range(self.noisesamples // b_size):
+                    y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
+                    n += torch.sum(torch.argmax(y_pred, dim=-1) == y[i]).item()
+            num_in.append(n / self.noisesamples)
+        return np.array(num_in) > self.acc_thresh
