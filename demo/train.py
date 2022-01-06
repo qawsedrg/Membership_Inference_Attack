@@ -77,22 +77,22 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()
                 t.set_description("Epoch {:}/{:} Train".format(epoch + 1, args.n_epochs))
                 t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
+        if (epoch + 1) % 10 == 0:
+            net.eval()
+            val_acc = 0
+            with torch.no_grad():
+                with tqdm(enumerate(testloader, 0), total=len(testloader)) as t:
+                    for i, data in t:
+                        correct_items = 0
 
-        net.eval()
-        val_acc = 0
-        with torch.no_grad():
-            with tqdm(enumerate(testloader, 0), total=len(testloader)) as t:
-                for i, data in t:
-                    correct_items = 0
+                        inputs, labels = data[0].to(device), data[1].to(device)
 
-                    inputs, labels = data[0].to(device), data[1].to(device)
+                        outputs = net(inputs)
+                        correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                        val_acc_batch = correct_items / args.batch_size
+                        val_acc += val_acc_batch
 
-                    outputs = net(inputs)
-                    correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
-                    val_acc_batch = correct_items / args.batch_size
-                    val_acc += val_acc_batch
-
-                    t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
-                    t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
-        if val_acc > val_acc_max:
-            torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+                        t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
+                        t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
+            if val_acc > val_acc_max:
+                torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

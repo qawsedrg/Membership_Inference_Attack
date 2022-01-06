@@ -288,9 +288,8 @@ class Augmentation():
     def __init__(self, device: torch.device):
         self.device = device
         # RandAugment ?
-        self.trans = [T.RandomRotation(10), T.ColorJitter(brightness=.5, hue=.3),
-                      T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
-        self.times = [3, 3, 3]
+        self.trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
+        self.times = [3, 3]
         self.acc_thresh = 0
         self.pre_thresh = 0
 
@@ -310,6 +309,7 @@ class Augmentation():
         data_y = np.concatenate((np.ones(data_x_in.shape[0]), np.zeros(data_x_out.shape[0])))
         # 要改用监督学习吗，万一都是in，然后硬是分成两部分导致准确率低
         # 效果好吗？
+        # 先tsne再分类？
         kmeans = KMeans(n_clusters=2, random_state=0).fit(data_x)
         # kmeans=SpectralClustering(n_clusters=2, affinity='nearest_neighbors',
         #                   assign_labels='kmeans').fit(data_x)
@@ -367,11 +367,62 @@ class Augmentation():
 
 
 class NoiseAttack():
-    def __init__(self):
-        pass
+    def __init__(self, shadowmodel: ShadowModels, device: torch.device):
+        self.shadowmodel = shadowmodel
+        self.device = device
+        self.acc_thresh = 0
+        self.pre_thresh = 0
+        self.stddev = 0.1
+        self.noisesamples = 2500
 
-    def train(self):
-        pass
+    def train(self, show=False):
+        if not os.path.exists("./dist_shadow_in_noise") or not os.path.exists("./dist_shadow_out_noise"):
+            # todo many shadow models
+            dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.stddev,
+                                             self.noisesamples
+                                             , self.device)
+            dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.stddev,
+                                              self.noisesamples
+                                              , self.device)
+            pickle.dump(dist_shadow_in, open("./dist_shadow_in_noise", "wb"))
+            pickle.dump(dist_shadow_out, open("./dist_shadow_out_noise", "wb"))
+        else:
+            dist_shadow_in = pickle.load(open("./dist_shadow_in_noise", "rb"))
+            dist_shadow_out = pickle.load(open("./dist_shadow_out_noise", "rb"))
+        dist_shadow = np.concatenate((dist_shadow_in, dist_shadow_out))
+        membership_shadow = np.concatenate((np.ones_like(dist_shadow_in), np.zeros_like(dist_shadow_out)))
+        acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, dist_shadow)
+        print("train_acc:{:},train_pre:{:}".format(acc, prec))
+        if show:
+            plt.hist(dist_shadow_in, bins=100, range=[0, 1], label="in")
+            plt.hist(dist_shadow_out, bins=100, range=[0, 1], label="out")
+            plt.legend()
+            plt.show()
+
+    @staticmethod
+    def train_base(loader, model, stddev, noise_samples, device):
+        num_in = []
+        model.to(device)
+        with tqdm(enumerate(loader, 0), total=len(loader)) as t:
+            for _, data in t:
+                xbatch, ybatch = data[0].to(device), data[1].to(device)
+                with torch.no_grad():
+                    y_pred = F.softmax(model(xbatch), dim=-1)
+                x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
+                y_selected = ybatch[torch.argmax(y_pred, dim=-1) == ybatch]
+                num_in.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
+                # num_iteration
+                for i in range(x_selected.shape[0]):
+                    noise = torch.from_numpy(stddev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(device)
+                    x_noisy = torch.clamp(x_selected[i] + noise, 0, 1).float()
+                    b_size = 100
+                    n = 0
+                    with torch.no_grad():
+                        for j in range(noise_samples // b_size):
+                            y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
+                            n += torch.sum(torch.argmax(y_pred, dim=-1) == y_selected[i]).item()
+                    num_in.append(n / noise_samples)
+        return num_in
 
     def evaluate(self):
         pass
