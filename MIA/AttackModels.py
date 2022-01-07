@@ -367,7 +367,7 @@ class NoiseAttack():
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
-        self.stddev = 0.1
+        self.stddev = [0.005, 0.01, 0.05, 0.1, 0.5, 1]
         self.noisesamples = 50
         self.transform = transform
 
@@ -409,14 +409,16 @@ class NoiseAttack():
                 num_in.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
                 # num_iteration
                 for i in range(x_selected.shape[0]):
-                    noise = torch.from_numpy(stddev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(device)
-                    x_noisy = torch.clamp(x_selected[i] + noise, 0, 1).float()
-                    b_size = 100
                     n = 0
-                    with torch.no_grad():
-                        for j in range(noise_samples // b_size):
-                            y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
-                            n += torch.sum(torch.argmax(y_pred, dim=-1) == y_selected[i]).item()
+                    for dev in stddev:
+                        noise = torch.from_numpy(dev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(device)
+                        # 注意范围
+                        x_noisy = torch.clamp(x_selected[i] + noise, -1, 1).float()
+                        b_size = 100
+                        with torch.no_grad():
+                            for j in range(noise_samples // b_size + 1):
+                                y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
+                                n += torch.sum(torch.argmax(y_pred, dim=-1) == y_selected[i]).item()
                     num_in.append(n / noise_samples)
         return num_in
 
