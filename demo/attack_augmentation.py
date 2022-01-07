@@ -4,6 +4,7 @@ import os.path
 import numpy as np
 import torch
 import torchvision
+import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 
 from MIA.AttackModels import Augmentation
@@ -31,6 +32,9 @@ if __name__ == "__main__":
     X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
-    attack_model = Augmentation(device)
-    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=True)
+    transform = T.Compose(
+        [T.ToTensor(),
+         T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    attack_model = Augmentation(device, transform=transform)
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=False)
     membership = attack_model(target, target_X, target_Y)

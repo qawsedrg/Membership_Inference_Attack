@@ -4,7 +4,7 @@ import os.path
 import numpy as np
 import torch
 import torchvision
-import torchvision.transforms as transforms
+import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
@@ -38,17 +38,18 @@ if __name__ == "__main__":
     X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
-    shadow_models = ShadowModels(net, args.shadow_num, shadow_X[:5000, :], shadow_Y[:5000], args.shadow_nepoch, device)
+    transform = T.Compose(
+        [T.ToTensor(),
+         T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    shadow_models = ShadowModels(net, args.shadow_num, shadow_X[:5000, :], shadow_Y[:5000], args.shadow_nepoch, device,
+                                 transform)
     shadow_models.train()
 
-    attack_model = NoiseAttack(shadow_models, device)
+    attack_model = NoiseAttack(shadow_models, device, transform)
     attack_model.train()
     attack_model.evaluate(target,
                           *train_test_split(target_X[:5000, :], target_Y[:5000], test_size=0.5, random_state=42))
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     loader = DataLoader(trainset(target_X[:1000, :], transform=transform), batch_size=100, shuffle=False)
     membership = np.array([])
     with torch.no_grad():

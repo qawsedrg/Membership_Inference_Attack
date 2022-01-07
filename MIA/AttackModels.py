@@ -24,13 +24,15 @@ from MIA.utils import trainset, train, attackmodel, forward, get_threshold
 
 # todo 统一接口
 class ConfidenceVector():
-    def __init__(self, shadowmodel: ShadowModels, epoches: int, device: torch.device, topx: Optional[int] = -1):
+    def __init__(self, shadowmodel: ShadowModels, epoches: int, device: torch.device, topx: Optional[int] = -1,
+                 transform: Optional = None):
         self.shadowdata = shadowmodel.data
         self.n_classes = int(max(torch.max(self.shadowdata.target_in).cpu().numpy(),
                                  torch.max(self.shadowdata.target_out).cpu().numpy()) + 1)
         self.topx = topx
         self.epoches = epoches
         self.device = device
+        self.transform = transform
 
     def train(self, show=False):
         self.attack_models = []
@@ -99,6 +101,7 @@ class ConfidenceVector():
             with torch.no_grad():
                 return X, Y, self.attack_models[0](X)
 
+    '''
     def show(self):
         # todo
         data_in = torch.sort(self.shadowdata.data_in, dim=-1)[0][:, -self.topx:].cpu()
@@ -128,7 +131,7 @@ class ConfidenceVector():
         ax.legend()
 
         plt.show()
-
+    '''
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
@@ -136,13 +139,10 @@ class ConfidenceVector():
 
         if target is not None:
             if self.topx == -1:
-                transform = T.Compose(
-                    [T.ToTensor(),
-                     T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
                 target.to(self.device)
-                loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_in, None, self.transform), batch_size=64, shuffle=False)
                 output_in = forward(target, loader, self.device)
-                loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_out, None, self.transform), batch_size=64, shuffle=False)
                 output_out = forward(target, loader, self.device)
                 _, _, result_in = self(F.softmax(output_in, dim=-1))
                 _, _, result_out = self(F.softmax(output_out, dim=-1))
@@ -153,14 +153,11 @@ class ConfidenceVector():
                     "acc : {:.2f}".format(
                         correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
             else:
-                transform = T.Compose(
-                    [T.ToTensor(),
-                     T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
                 target.to(self.device)
-                loader = DataLoader(trainset(X_in, None, transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_in, None, self.transform), batch_size=64, shuffle=False)
                 output_in = forward(target, loader, self.device)
                 output_in = torch.sort(output_in, dim=-1)[0][:, -self.topx:]
-                loader = DataLoader(trainset(X_out, None, transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_out, None, self.transform), batch_size=64, shuffle=False)
                 output_out = forward(target, loader, self.device)
                 output_out = torch.sort(output_out, dim=-1)[0][:, -self.topx:]
                 _, _, result_in = self(F.softmax(output_in, dim=-1))
@@ -209,11 +206,12 @@ class ConfidenceVector():
 
 class BoundaryDistance():
     # todo test correcteness
-    def __init__(self, shadowmodel: ShadowModels, device: torch.device):
+    def __init__(self, shadowmodel: ShadowModels, device: torch.device, transform: Optional = None):
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
+        self.transform = transform
 
     def train(self, show=False):
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
@@ -265,11 +263,8 @@ class BoundaryDistance():
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
         if not os.path.exists("./dist_target_in") or not os.path.exists("./dist_target_out"):
-            transform = T.Compose(
-                [T.ToTensor(),
-                 T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-            loader_in = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
-            loader_out = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
+            loader_in = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
+            loader_out = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
             dist_target_in = self.train_base(loader_in, target, self.device)
             dist_target_out = self.train_base(loader_out, target, self.device)
             pickle.dump(dist_target_in, open("./dist_target_in", "wb"))
@@ -285,24 +280,24 @@ class BoundaryDistance():
 
 
 class Augmentation():
-    def __init__(self, device: torch.device):
+    def __init__(self, device: torch.device, trans: Optional = None, times: Optional = None,
+                 transform: Optional = None):
         self.device = device
         # RandAugment ?
-        self.trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
-        self.times = [3, 3]
+        self.trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))] if trans == None else trans
+        self.times = [3 for _ in range(len(self.trans))] if times == None else times
+        assert len(self.times) == len(self.trans)
         self.acc_thresh = 0
         self.pre_thresh = 0
+        self.transform = transform
 
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None,show=False):
         # 需要保证所有数据都用同一个变换吗，还是同一类型就行
-        transform = T.Compose(
-            [T.ToTensor(),
-             T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        loader_train = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
-        loader_test = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
+        loader_train = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
+        loader_test = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
         data_x_in = self.train_base(target, loader_train).cpu().numpy()
         data_x_out = self.train_base(target, loader_test).cpu().numpy()
         data_x = np.concatenate((data_x_in, data_x_out), axis=0)
@@ -367,13 +362,14 @@ class Augmentation():
 
 
 class NoiseAttack():
-    def __init__(self, shadowmodel: ShadowModels, device: torch.device):
+    def __init__(self, shadowmodel: ShadowModels, device: torch.device, transform: Optional = None):
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
         self.stddev = 0.1
-        self.noisesamples = 2500
+        self.noisesamples = 50
+        self.transform = transform
 
     def train(self, show=False):
         if not os.path.exists("./dist_shadow_in_noise") or not os.path.exists("./dist_shadow_out_noise"):
@@ -429,11 +425,8 @@ class NoiseAttack():
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
         if not os.path.exists("./dist_target_in_noise") or not os.path.exists("./dist_target_out_noise"):
-            transform = T.Compose(
-                [T.ToTensor(),
-                 T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-            loader_in = DataLoader(trainset(X_in, Y_in, transform), batch_size=64, shuffle=False)
-            loader_out = DataLoader(trainset(X_out, Y_out, transform), batch_size=64, shuffle=False)
+            loader_in = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
+            loader_out = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
             dist_target_in = self.train_base(loader_in, target, self.stddev,
                                              self.noisesamples
                                              , self.device)
