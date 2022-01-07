@@ -413,7 +413,7 @@ class NoiseAttack():
                     for dev in stddev:
                         noise = torch.from_numpy(dev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(device)
                         # 注意范围
-                        x_noisy = torch.clamp(x_selected[i] + noise, -1, 1).float()
+                        x_noisy = torch.clamp(x_selected[i, :] + noise, -1, 1).float()
                         b_size = 100
                         with torch.no_grad():
                             for j in range(noise_samples // b_size + 1):
@@ -447,16 +447,17 @@ class NoiseAttack():
         print("test_acc:{:},test_pre:{:}".format(acc, prec))
 
     def __call__(self, model, X: torch.Tensor):
-        y = F.softmax(model(X), dim=-1)
+        y = torch.argmax(F.softmax(model(X), dim=-1), dim=-1)
         num_in = []
         for i in range(X.shape[0]):
-            noise = torch.from_numpy(self.stddev * np.random.randn(self.noisesamples, *X.shape[1:])).to(self.device)
-            x_noisy = torch.clamp(X[i] + noise, 0, 1).float()
-            b_size = 100
             n = 0
-            with torch.no_grad():
-                for j in range(self.noisesamples // b_size):
-                    y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
-                    n += torch.sum(torch.argmax(y_pred, dim=-1) == y[i]).item()
+            for dev in self.stddev:
+                noise = torch.from_numpy(dev * np.random.randn(self.noisesamples, *X.shape[1:])).to(self.device)
+                x_noisy = torch.clamp(X[i, :] + noise, -1, 1).float()
+                b_size = 100
+                with torch.no_grad():
+                    for j in range(self.noisesamples // b_size + 1):
+                        y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
+                        n += torch.sum(torch.argmax(y_pred, dim=-1) == y[i]).item()
             num_in.append(n / self.noisesamples)
         return np.array(num_in) > self.acc_thresh
