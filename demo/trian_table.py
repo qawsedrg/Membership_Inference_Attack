@@ -6,12 +6,11 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from torch import nn
 import torch
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
 import torch.optim as optim
 from tqdm import tqdm
 from MIA.utils import trainset
+from model import Model
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
@@ -23,10 +22,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     with open("../data/purchase_x", "rb") as f:
-        X = pickle.load(f)
-    with open("../data/"
-              "purchase_y", "rb") as f:
-        Y = pickle.load(f)
+        X = pickle.load(f).astype(np.float32)
+    with open("../data/purchase_y", "rb") as f:
+        Y = pickle.load(f).astype(np.longlong)
 
     Y = np.squeeze(Y)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
@@ -34,21 +32,6 @@ if __name__ == "__main__":
                                                                                     random_state=42)
     shadow_train_X, shadow_test_X, shadow_train_Y, shadow_test_Y = train_test_split(shadow_X, shadow_Y, test_size=0.5,
                                                                                     random_state=42)
-
-
-    class Model(nn.Module):
-        def __init__(self, n):
-            super().__init__()
-            self.fc1 = nn.Linear(n, 1024)
-            self.fc2 = nn.Linear(1024, 512)
-            self.fc3 = nn.Linear(512, 100)
-
-        def forward(self, x):
-            x = F.relu(self.fc1(x))
-            x = F.relu(self.fc2(x))
-            x = self.fc3(x)
-            return x
-
 
     trainloader = DataLoader(trainset(target_train_X, target_train_Y), batch_size=args.batch_size,
                              shuffle=True)
@@ -78,12 +61,12 @@ if __name__ == "__main__":
 
                 optimizer.zero_grad()
 
-                outputs = net(inputs.float())
+                outputs = net(inputs)
                 correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
                 acc_batch = correct_items / args.batch_size
                 acc += acc_batch
 
-                loss = criterion(outputs, labels.long())
+                loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
 
@@ -100,7 +83,7 @@ if __name__ == "__main__":
 
                     inputs, labels = data[0].to(device), data[1].to(device)
 
-                    outputs = net(inputs.float())
+                    outputs = net(inputs)
                     correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
                     val_acc_batch = correct_items / args.batch_size
                     val_acc += val_acc_batch
