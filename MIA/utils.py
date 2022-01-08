@@ -107,7 +107,7 @@ def get_threshold(membership, vec, thresholds=None):
     precision_scores = []
     if thresholds is None:
         def f(thresholds):
-            for thresh in tqdm(thresholds):
+            for thresh in thresholds:
                 accuracy_scores.append(accuracy_score(membership, (vec > thresh).astype(int)))
                 precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
                 accuracies = np.array(accuracy_scores)

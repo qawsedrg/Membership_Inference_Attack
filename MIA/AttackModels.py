@@ -440,6 +440,7 @@ class NoiseAttack():
         acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, dist_shadow)
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
         if show:
+            ##
             plt.hist(dist_shadow_in, bins=100, range=[0, 1], label="in")
             plt.hist(dist_shadow_out, bins=100, range=[0, 1], label="out")
             plt.legend()
@@ -463,7 +464,7 @@ class NoiseAttack():
                     for dev in stddev:
                         noise = torch.from_numpy(dev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(device)
                         # 注意范围
-                        x_noisy = torch.clamp(x_selected[i, :] + noise, -1, 1).float()
+                        x_noisy = torch.clamp(x_selected[i, :] + noise, 0, 1).float()
                         b_size = 100
                         with torch.no_grad():
                             for j in range(noise_samples // b_size + 1):
@@ -503,7 +504,8 @@ class NoiseAttack():
             n = 0
             for dev in self.stddev:
                 noise = torch.from_numpy(dev * np.random.randn(self.noisesamples, *X.shape[1:])).to(self.device)
-                x_noisy = torch.clamp(X[i, :] + noise, -1, 1).float()
+                ##
+                x_noisy = torch.clamp(X[i, :] + noise, 0, 1).float()
                 b_size = 100
                 with torch.no_grad():
                     for j in range(self.noisesamples // b_size + 1):
