@@ -27,35 +27,44 @@ class trainset(Dataset):
         return self.X.shape[0]
 
 
-def train(model, loader, device, optimizer, criterion, epoches):
+def train(model, loader, device, optimizer, criterion, epoches, verbose=True):
     model.train()
     model.to(device)
     for epoch in range(epoches):
         epoch_loss = 0
         acc = 0
-        with tqdm(enumerate(loader, 0), total=len(loader)) as t:
-            for i, data in t:
-                correct_items = 0
-                inputs, labels = data[0].to(device), data[1].to(device)
+        if verbose:
+            with tqdm(enumerate(loader, 0), total=len(loader)) as t:
+                for i, data in t:
+                    correct_items = 0
+                    inputs, labels = data[0].to(device), data[1].to(device)
 
+                    optimizer.zero_grad()
+                    outputs = model(inputs)
+                    if len(outputs.shape) == 2:
+                        correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                    elif len(outputs.shape) == 1:
+                        correct_items += torch.sum(outputs[labels == 1] > .5).item()
+                        correct_items += torch.sum(outputs[labels == 0] < .5).item()
+                    else:
+                        raise
+                    acc_batch = correct_items / loader.batch_size
+                    acc += acc_batch
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    optimizer.step()
+
+                    epoch_loss += loss.item()
+                    t.set_description("Epoch {:}/{:} Train".format(epoch + 1, epoches))
+                    t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
+        else:
+            for i, data in enumerate(loader, 0):
+                inputs, labels = data[0].to(device), data[1].to(device)
                 optimizer.zero_grad()
                 outputs = model(inputs)
-                if len(outputs.shape) == 2:
-                    correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
-                elif len(outputs.shape) == 1:
-                    correct_items += torch.sum(outputs[labels == 1] > .5).item()
-                    correct_items += torch.sum(outputs[labels == 0] < .5).item()
-                else:
-                    raise
-                acc_batch = correct_items / loader.batch_size
-                acc += acc_batch
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
-
-                epoch_loss += loss.item()
-                t.set_description("Epoch {:}/{:} Train".format(epoch + 1, epoches))
-                t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
     return model
 
 
@@ -92,34 +101,6 @@ class attackmodel(nn.Module):
         x = F.relu(self.fc1(x))
         x = torch.squeeze(nn.Sigmoid()(self.fc2(x)), dim=-1)
         return x
-
-
-'''
-def get_threshold(membership: numpy.array, vec: numpy.array, thresholds=None):
-    accuracy_scores = []
-    precision_scores = []
-    if thresholds is None:
-        fpr, tpr, thresholds = roc_curve(membership, vec)
-        for thresh in thresholds:
-            accuracy_scores.append(accuracy_score(membership, (vec > thresh).astype(int)))
-            precision_scores.append(precision_score(membership, (vec > thresh).astype(int)))
-            accuracies = np.array(accuracy_scores)
-            precisions = np.array(precision_scores)
-            max_accuracy = accuracies.max()
-            max_precision = precisions.max()
-            max_accuracy_threshold = thresholds[accuracies.argmax()]
-            max_precision_threshold = thresholds[precisions.argmax()]
-        return max_accuracy, max_accuracy_threshold, max_precision, max_precision_threshold
-    else:
-        accuracy_scores.append(accuracy_score(membership, (vec > thresholds).astype(int)))
-        precision_scores.append(precision_score(membership, (vec > thresholds).astype(int)))
-        accuracies = np.array(accuracy_scores)
-        precisions = np.array(precision_scores)
-        max_accuracy = accuracies.max()
-        max_precision = precisions.max()
-        return max_accuracy, None, max_precision, None
-'''
-
 
 def get_threshold(membership, vec, thresholds=None):
     accuracy_scores = []
@@ -159,6 +140,7 @@ def get_threshold(membership, vec, thresholds=None):
         max_accuracy = accuracies.max()
         max_precision = precisions.max()
         return max_accuracy, None, max_precision, None
+
 
 def memguard(scores):
     # Label-Only Membership Inference Attacks (membership-inference-master)

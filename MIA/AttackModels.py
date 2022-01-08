@@ -2,6 +2,8 @@ import os.path
 import pickle
 from typing import Optional
 from tqdm import tqdm
+from multiprocessing.pool import ThreadPool
+import multiprocessing
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,6 +39,7 @@ class ConfidenceVector():
     def train(self, show=False):
         self.attack_models = []
         if self.topx == -1:
+            '''
             for i in range(self.n_classes):
                 train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
                                      self.shadowdata.data_out[self.shadowdata.target_out == i]), dim=0)
@@ -68,6 +71,52 @@ class ConfidenceVector():
                     ax.legend()
 
                     plt.show()
+            '''
+
+            def f(Is, show=False):
+                attack_models = []
+                for i in Is:
+                    train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
+                                         self.shadowdata.data_out[self.shadowdata.target_out == i]), dim=0)
+                    train_y = torch.cat((torch.ones(torch.sum(self.shadowdata.target_in == i).cpu().numpy()),
+                                         torch.zeros(torch.sum(self.shadowdata.target_out == i).cpu().numpy()))).to(
+                        self.device)
+                    attack_model = attackmodel(train_x.shape[-1])
+                    attack_model.to(self.device)
+                    optimizer = optim.Adam(attack_model.parameters(), lr=0.001)
+                    loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
+                    print("Training attack model for class {:}".format(i))
+                    attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
+                                         epoches=self.epoches, verbose=False)
+                    attack_models.append(attack_model)
+                    if show:
+                        fig = plt.figure()
+                        train_x_in = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
+                        train_x_out = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
+                        X_in_tsne = TSNE(n_components=2).fit_transform(train_x_in)
+                        X_out_tsne = TSNE(n_components=2).fit_transform(train_x_out)
+
+                        ax = fig.add_subplot()
+
+                        ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
+                        ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
+
+                        ax.set_xlabel('X_{:} Label'.format(i))
+                        ax.set_ylabel('Y_{:} Label'.format(i))
+                        ax.legend()
+
+                        plt.show()
+                return attack_models
+
+            numberOfThreads = multiprocessing.cpu_count()
+            pool = ThreadPool(processes=numberOfThreads)
+            Chunks = np.array_split(list(range(self.n_classes)), numberOfThreads)
+            results = pool.map_async(f, Chunks)
+            pool.close()
+            pool.join()
+            for result in results.get():
+                attack_model = result
+                self.attack_models.extend(attack_model)
         else:
             train_x = torch.sort(torch.cat((self.shadowdata.data_in, self.shadowdata.data_out), dim=0), dim=-1)[0][:,
                       -self.topx:].to(self.device)
@@ -132,6 +181,7 @@ class ConfidenceVector():
 
         plt.show()
     '''
+
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
@@ -294,7 +344,7 @@ class Augmentation():
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
-                 Y_out: Optional[np.ndarray] = None,show=False):
+                 Y_out: Optional[np.ndarray] = None, show=False):
         # 需要保证所有数据都用同一个变换吗，还是同一类型就行
         loader_train = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
         loader_test = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
