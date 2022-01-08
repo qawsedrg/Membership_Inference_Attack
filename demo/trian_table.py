@@ -62,7 +62,7 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
 
                 outputs = net(inputs)
-                correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                correct_items += torch.sum(torch.argmax(outputs, dim=-1) == labels).item()
                 acc_batch = correct_items / args.batch_size
                 acc += acc_batch
 
@@ -84,11 +84,12 @@ if __name__ == "__main__":
                     inputs, labels = data[0].to(device), data[1].to(device)
 
                     outputs = net(inputs)
-                    correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                    correct_items += torch.sum(torch.argmax(outputs, dim=-1) == labels).item()
                     val_acc_batch = correct_items / args.batch_size
                     val_acc += val_acc_batch
 
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         if val_acc > val_acc_max:
+            val_acc_max = val_acc
             torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
