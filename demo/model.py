@@ -34,6 +34,7 @@ class Model(nn.Module):
         x = self.fc3(x)
         return x
 
+
 class TextClassificationModel(nn.Module):
 
     def __init__(self, vocab_size, embed_dim, num_class):

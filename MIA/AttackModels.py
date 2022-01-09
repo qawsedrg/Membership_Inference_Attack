@@ -29,6 +29,7 @@ class ConfidenceVector():
     def __init__(self, shadowmodel: ShadowModels, epoches: int, device: torch.device, topx: Optional[int] = -1,
                  transform: Optional = None):
         self.shadowdata = shadowmodel.data
+        self.collate_fn = shadowmodel.collate_fn
         self.n_classes = int(max(torch.max(self.shadowdata.target_in).cpu().numpy(),
                                  torch.max(self.shadowdata.target_out).cpu().numpy()) + 1)
         self.topx = topx
@@ -39,7 +40,6 @@ class ConfidenceVector():
     def train(self, show=False):
         self.attack_models = []
         if self.topx == -1:
-            '''
             for i in range(self.n_classes):
                 train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
                                      self.shadowdata.data_out[self.shadowdata.target_out == i]), dim=0)
@@ -108,7 +108,7 @@ class ConfidenceVector():
                         plt.show()
                 return attack_models
 
-            numberOfThreads = multiprocessing.cpu_count()
+            numberOfThreads = min(multiprocessing.cpu_count(),self.n_classes)
             pool = ThreadPool(processes=numberOfThreads)
             Chunks = np.array_split(list(range(self.n_classes)), numberOfThreads)
             results = pool.map_async(f, Chunks)
@@ -117,6 +117,7 @@ class ConfidenceVector():
             for result in results.get():
                 attack_model = result
                 self.attack_models.extend(attack_model)
+            '''
         else:
             train_x = torch.sort(torch.cat((self.shadowdata.data_in, self.shadowdata.data_out), dim=0), dim=-1)[0][:,
                       -self.topx:].to(self.device)
@@ -190,9 +191,11 @@ class ConfidenceVector():
         if target is not None:
             if self.topx == -1:
                 target.to(self.device)
-                loader = DataLoader(trainset(X_in, None, self.transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False,
+                                    collate_fn=self.collate_fn)
                 output_in = forward(target, loader, self.device)
-                loader = DataLoader(trainset(X_out, None, self.transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False,
+                                    collate_fn=self.collate_fn)
                 output_out = forward(target, loader, self.device)
                 _, _, result_in = self(F.softmax(output_in, dim=-1))
                 _, _, result_out = self(F.softmax(output_out, dim=-1))
@@ -204,10 +207,12 @@ class ConfidenceVector():
                         correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
             else:
                 target.to(self.device)
-                loader = DataLoader(trainset(X_in, None, self.transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False,
+                                    collate_fn=self.collate_fn)
                 output_in = forward(target, loader, self.device)
                 output_in = torch.sort(output_in, dim=-1)[0][:, -self.topx:]
-                loader = DataLoader(trainset(X_out, None, self.transform), batch_size=64, shuffle=False)
+                loader = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False,
+                                    collate_fn=self.collate_fn)
                 output_out = forward(target, loader, self.device)
                 output_out = torch.sort(output_out, dim=-1)[0][:, -self.topx:]
                 _, _, result_in = self(F.softmax(output_in, dim=-1))

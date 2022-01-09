@@ -19,9 +19,9 @@ class trainset(Dataset):
 
     def __getitem__(self, index):
         if self.Y is None:
-            return self.transform(self.X[index, :]) if self.transform is not None else self.X[index, :]
+            return self.transform(self.X[index]) if self.transform is not None else self.X[index]
         else:
-            return self.transform(self.X[index, :]) if self.transform is not None else self.X[index, :], self.Y[index]
+            return self.transform(self.X[index]) if self.transform is not None else self.X[index], self.Y[index]
 
     def __len__(self):
         return self.X.shape[0]
@@ -37,10 +37,11 @@ def train(model, loader, device, optimizer, criterion, epoches, verbose=True):
             with tqdm(enumerate(loader, 0), total=len(loader)) as t:
                 for i, data in t:
                     correct_items = 0
-                    inputs, labels = data[0].to(device), data[1].to(device)
+                    data = [d.to(device) for d in data]
+                    labels = data[-1]
 
                     optimizer.zero_grad()
-                    outputs = model(inputs)
+                    outputs = model(*data[:-1])
                     if len(outputs.shape) == 2:
                         correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
                     elif len(outputs.shape) == 1:
@@ -59,9 +60,10 @@ def train(model, loader, device, optimizer, criterion, epoches, verbose=True):
                     t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
         else:
             for i, data in enumerate(loader, 0):
-                inputs, labels = data[0].to(device), data[1].to(device)
+                data = [d.to(device) for d in data]
+                labels = data[-1]
                 optimizer.zero_grad()
-                outputs = model(inputs)
+                outputs = model(*data[:-1])
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -76,9 +78,10 @@ def forward(model, loader, device):
         for i, data in enumerate(loader, 0):
             if type(data) is torch.Tensor:
                 inputs = data.to(device)
+                outputs = model(inputs)
             else:
-                inputs = data[0].to(device)
-            outputs = model(inputs)
+                inputs = [d.to(device) for d in data[:-1]]
+                outputs = model(*inputs)
             result = torch.cat((result, outputs), dim=0)
     return result
 
@@ -101,6 +104,7 @@ class attackmodel(nn.Module):
         x = F.relu(self.fc1(x))
         x = torch.squeeze(nn.Sigmoid()(self.fc2(x)), dim=-1)
         return x
+
 
 def get_threshold(membership, vec, thresholds=None):
     accuracy_scores = []
