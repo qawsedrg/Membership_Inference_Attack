@@ -177,4 +177,7 @@ class augmentation_wrapper():
         self.n = n
 
     def __call__(self, text):
-        return self.aug(text, n=self.n, num_thread=multiprocessing.cpu_count())
+        return self.aug.augment(text, n=self.n, num_thread=multiprocessing.cpu_count())
+
+    def to(self, *args, **kwargs):
+        pass

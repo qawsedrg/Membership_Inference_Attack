@@ -300,7 +300,7 @@ class BoundaryDistance():
 
 class Augmentation():
     def __init__(self, device: torch.device, trans: Optional = None, times: Optional = None,
-                 transform: Optional = None):
+                 transform: Optional = None, collate_fn: Optional = None, batch_size: Optional[int] = 64):
         self.device = device
         # RandAugment ?
         self.trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))] if trans == None else trans
@@ -309,16 +309,24 @@ class Augmentation():
         self.acc_thresh = 0
         self.pre_thresh = 0
         self.transform = transform
+        self.collate_fn = collate_fn
+        self.batch_size = batch_size
 
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None, show=False):
+        if not os.path.exists("./data_x_in") or not os.path.exists("./data_x_out"):
+            loader_train = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=self.batch_size, shuffle=False)
+            loader_test = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=self.batch_size, shuffle=False)
+            data_x_in = self.train_base(target, loader_train).cpu().numpy()
+            data_x_out = self.train_base(target, loader_test).cpu().numpy()
+            pickle.dump(data_x_in, open("./data_x_in", "wb"))
+            pickle.dump(data_x_out, open("./data_x_out", "wb"))
+        else:
+            data_x_in = pickle.load(open("./data_x_in", "rb"))
+            data_x_out = pickle.load(open("./data_x_out", "rb"))
         # 需要保证所有数据都用同一个变换吗，还是同一类型就行
-        loader_train = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
-        loader_test = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
-        data_x_in = self.train_base(target, loader_train).cpu().numpy()
-        data_x_out = self.train_base(target, loader_test).cpu().numpy()
         data_x = np.concatenate((data_x_in, data_x_out), axis=0)
         data_y = np.concatenate((np.ones(data_x_in.shape[0]), np.zeros(data_x_out.shape[0])))
         # 要改用监督学习吗，万一都是in，然后硬是分成两部分导致准确率低
@@ -369,9 +377,17 @@ class Augmentation():
                 with tqdm(loader, total=len(loader)) as t:
                     t.set_description("Transformation {:}|{:}".format(i, j))
                     for data in t:
-                        xbatch, ybatch = tran(data[0].to(self.device)), data[1].to(self.device)
+                        if isinstance(data[0], torch.Tensor):
+                            data = tran(data[0].to(self.device)), data[1].to(self.device)
+                        else:
+                            auged = tran(data[0][0])
+                            data = [(auged[i], data[1].to(self.device)) for i in range(tran.n)]
+                            data = self.collate_fn(data)
                         with torch.no_grad():
-                            y_pred = F.softmax(model(xbatch), dim=-1)
+                            data = [d.to(self.device) for d in data]
+                            xbatch = data[:-1]
+                            ybatch = data[-1]
+                            y_pred = F.softmax(model(*xbatch), dim=-1)
                         result_one_step = torch.cat((result_one_step, torch.argmax(y_pred, dim=-1) == ybatch), dim=0)
                 result = torch.cat((result, torch.unsqueeze(result_one_step, dim=-1)), dim=-1)
         return result
