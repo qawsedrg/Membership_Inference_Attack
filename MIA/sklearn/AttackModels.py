@@ -37,7 +37,7 @@ class ConfidenceVector():
     def train(self):
         self.attack_models = []
         if self.topx == -1:
-            '''
+
             for i in range(self.n_classes):
                 train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
                                      self.shadowdata.data_out[self.shadowdata.target_out == i]), dim=0)
@@ -81,6 +81,7 @@ class ConfidenceVector():
             for result in results.get():
                 attack_model = result
                 self.attack_models.extend(attack_model)
+            '''
 
         else:
             train_x = torch.sort(torch.cat((self.shadowdata.data_in, self.shadowdata.data_out), dim=0), dim=-1)[0][:,
