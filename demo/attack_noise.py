@@ -46,7 +46,7 @@ if __name__ == "__main__":
     shadow_models.train()
 
     attack_model = NoiseAttack(shadow_models, device, transform)
-    attack_model.train()
+    attack_model.train(show=True)
     attack_model.evaluate(target,
                           *train_test_split(target_X[:5000, :], target_Y[:5000], test_size=0.5, random_state=42))
 

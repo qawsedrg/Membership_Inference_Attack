@@ -37,9 +37,10 @@ class ConfidenceVector():
         self.device = device
         self.transform = transform
 
-    def train(self, show=False):
+    def train(self):
         self.attack_models = []
         if self.topx == -1:
+            '''
             for i in range(self.n_classes):
                 train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
                                      self.shadowdata.data_out[self.shadowdata.target_out == i]), dim=0)
@@ -54,26 +55,9 @@ class ConfidenceVector():
                 attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                      epoches=self.epoches)
                 self.attack_models.append(attack_model)
-                if show:
-                    fig = plt.figure()
-                    train_x_in = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
-                    train_x_out = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
-                    X_in_tsne = TSNE(n_components=2).fit_transform(train_x_in)
-                    X_out_tsne = TSNE(n_components=2).fit_transform(train_x_out)
-
-                    ax = fig.add_subplot()
-
-                    ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
-                    ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
-
-                    ax.set_xlabel('X_{:} Label'.format(i))
-                    ax.set_ylabel('Y_{:} Label'.format(i))
-                    ax.legend()
-
-                    plt.show()
             '''
 
-            def f(Is, show=False):
+            def f(Is):
                 attack_models = []
                 for i in Is:
                     train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
@@ -89,23 +73,6 @@ class ConfidenceVector():
                     attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                          epoches=self.epoches, verbose=False)
                     attack_models.append(attack_model)
-                    if show:
-                        fig = plt.figure()
-                        train_x_in = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
-                        train_x_out = self.shadowdata.data_in[self.shadowdata.target_in == i].cpu()
-                        X_in_tsne = TSNE(n_components=2).fit_transform(train_x_in)
-                        X_out_tsne = TSNE(n_components=2).fit_transform(train_x_out)
-
-                        ax = fig.add_subplot()
-
-                        ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^', label="Not Trained")
-                        ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
-
-                        ax.set_xlabel('X_{:} Label'.format(i))
-                        ax.set_ylabel('Y_{:} Label'.format(i))
-                        ax.legend()
-
-                        plt.show()
                 return attack_models
 
             numberOfThreads = min(multiprocessing.cpu_count(),self.n_classes)
@@ -117,7 +84,7 @@ class ConfidenceVector():
             for result in results.get():
                 attack_model = result
                 self.attack_models.extend(attack_model)
-            '''
+
         else:
             train_x = torch.sort(torch.cat((self.shadowdata.data_in, self.shadowdata.data_out), dim=0), dim=-1)[0][:,
                       -self.topx:].to(self.device)
@@ -373,14 +340,19 @@ class Augmentation():
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
         if show:
             fig = plt.figure()
-            X_in_tsne = TSNE(n_components=2).fit_transform(data_x_in)
-            X_out_tsne = TSNE(n_components=2).fit_transform(data_x_out)
+            X_in_tsne = TSNE(n_components=2, random_state=0).fit_transform(data_x_in)
+            X_out_tsne = TSNE(n_components=2, random_state=0).fit_transform(data_x_out)
 
             ax = fig.add_subplot()
 
+            '''
             ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], c=kmeans.labels_[:len(data_x_in)], marker='^',
                        label="Not Trained")
             ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], c=kmeans.labels_[len(data_x_in):], marker='o', label="Trained")
+            '''
+            ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^',
+                       label="Not Trained")
+            ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")
 
             ax.set_xlabel('X Label')
             ax.set_ylabel('Y Label')
@@ -408,10 +380,7 @@ class Augmentation():
         return result
 
     def __call__(self, model, X: np.ndarray, Y: np.ndarray):
-        transform = T.Compose(
-            [T.ToTensor(),
-             T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        loader = DataLoader(trainset(X, Y, transform), batch_size=64, shuffle=False)
+        loader = DataLoader(trainset(X, Y, self.transform), batch_size=64, shuffle=False)
         out = self.train_base(model, loader).cpu().numpy()
         return KMeans(n_clusters=2, random_state=0).fit(out).labels_
 
@@ -422,7 +391,7 @@ class NoiseAttack():
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
-        self.stddev = [0.005, 0.01, 0.05, 0.1, 0.5, 1]
+        self.stddev = [0.005, 0.01, 0.03, 0.05, 0.07, 0.1]
         self.noisesamples = 50
         self.transform = transform
 

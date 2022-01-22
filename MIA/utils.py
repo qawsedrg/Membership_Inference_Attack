@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 import multiprocessing
+import nlpaug.augmenter.word as naw
 
 
 class trainset(Dataset):
@@ -168,3 +169,17 @@ def memguard(scores):
     defended_scores = np.ones_like(scores) * off_score
     defended_scores[np.arange(len(defended_scores)), predicted_labels] = on_score
     return defended_scores
+
+
+class augmentation_wrapper():
+    def __init__(self, aug, n):
+        self.aug = aug
+        self.n = n
+
+    def __call__(self, text):
+        return self.aug(text, n=self.n, num_thread=multiprocessing.cpu_count())
+
+
+class sklearn_wrapper(nn.Module):
+    def __init__(self):
+        super().__init__()

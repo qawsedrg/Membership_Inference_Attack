@@ -43,8 +43,6 @@ if __name__ == "__main__":
     testloader = DataLoader(trainset(target_X_test, target_Y_test, transform), batch_size=args.batch_size,
                             shuffle=False, num_workers=2)
 
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
@@ -77,7 +75,7 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()
                 t.set_description("Epoch {:}/{:} Train".format(epoch + 1, args.n_epochs))
                 t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 1 == 0:
             net.eval()
             val_acc = 0
             with torch.no_grad():
