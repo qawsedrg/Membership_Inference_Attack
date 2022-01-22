@@ -8,9 +8,9 @@ import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.torch.AttackModels import BoundaryDistance
-from MIA.torch.utils import trainset
-from MIA.torch.ShadowModels import ShadowModels
+from MIA.AttackModels import BoundaryDistance
+from MIA.utils import trainset
+from MIA.ShadowModels import ShadowModels
 from model import CIFAR
 
 parser = argparse.ArgumentParser()

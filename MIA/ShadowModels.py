@@ -7,7 +7,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from typing import Optional
 
-from MIA import trainset, train, forward, DataStruct
+from MIA.utils import trainset, train, forward, DataStruct
 
 
 class ShadowModels:

@@ -7,7 +7,7 @@ import torchvision
 import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 
-from MIA.torch.AttackModels import Augmentation
+from MIA.AttackModels import Augmentation
 from model import CIFAR
 
 parser = argparse.ArgumentParser()

@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from sklearn.cluster import KMeans
 
 from MIA import ShadowModels
-from MIA import trainset, train, attackmodel, forward, get_threshold
+from MIA.utils import trainset, train, attackmodel, forward, get_threshold
 
 
 # todo 统一接口

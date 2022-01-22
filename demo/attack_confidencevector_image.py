@@ -9,9 +9,9 @@ import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.torch.AttackModels import ConfidenceVector
-from MIA.torch.ShadowModels import ShadowModels
-from MIA.torch.utils import trainset
+from MIA.AttackModels import ConfidenceVector
+from MIA.ShadowModels import ShadowModels
+from MIA.utils import trainset
 from model import CIFAR
 
 parser = argparse.ArgumentParser()

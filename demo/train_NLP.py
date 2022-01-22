@@ -11,7 +11,7 @@ from tqdm import tqdm
 import numpy as np
 
 from model import TextClassificationModel
-from MIA.torch.utils import trainset
+from MIA.utils import trainset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=10, type=int)

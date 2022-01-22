@@ -8,8 +8,8 @@ from torchtext.data.utils import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
 from sklearn.model_selection import train_test_split
 
-from MIA.torch.AttackModels import ConfidenceVector
-from MIA.torch.ShadowModels import ShadowModels
+from MIA.AttackModels import ConfidenceVector
+from MIA.ShadowModels import ShadowModels
 from model import TextClassificationModel
 
 parser = argparse.ArgumentParser()
