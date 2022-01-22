@@ -44,7 +44,7 @@ if __name__ == "__main__":
     shadow_models.train()
 
     attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
-    attack_model.train(show=False)
+    attack_model.train()
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 

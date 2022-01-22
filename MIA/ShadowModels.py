@@ -11,7 +11,7 @@ from MIA.utils import trainset, train, forward, DataStruct
 
 
 class ShadowModels:
-    def __init__(self, models: nn.Module, N: int, X: torch.Tensor, Y: torch.Tensor, epoches: int, device: torch.device,
+    def __init__(self, models, N: int, X: torch.Tensor, Y: torch.Tensor, epoches: int, device: torch.device,
                  transform: Optional = None, collate_fn: Optional = None, opt: Optional = None, lr: Optional = None):
         self.models = models
         self.N = N
@@ -35,31 +35,39 @@ class ShadowModels:
         Y_out = torch.Tensor().to(self.device)
         for i in range(self.N):
             model = self.models
-            optimizer = self.opt(model.parameters(), lr=self.lr)
             shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
                                                                                             test_size=0.5,
                                                                                             random_state=i)
-            loader = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64, shuffle=True,
-                                collate_fn=self.collate_fn)
-            model = train(model, loader, self.device, optimizer=optimizer, criterion=nn.CrossEntropyLoss(),
-                          epoches=self.epoches)
-            self.model_trained.append(model)
-            model.eval()
-            with torch.no_grad():
+            if isinstance(model, nn.Module):
+                optimizer = self.opt(model.parameters(), lr=self.lr)
+                loader = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
+                                    shuffle=True,
+                                    collate_fn=self.collate_fn)
+                model = train(model, loader, self.device, optimizer=optimizer, criterion=nn.CrossEntropyLoss(),
+                              epoches=self.epoches)
+                self.model_trained.append(model)
+                model.eval()
                 loader_train = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
                                           shuffle=False, collate_fn=self.collate_fn)
                 loader_test = DataLoader(trainset(shadow_X_test, shadow_Y_test, self.transform), batch_size=64,
                                          shuffle=False, collate_fn=self.collate_fn)
                 self.loader_train = loader_train
                 self.loader_test = loader_test
-                X_in = torch.cat((X_in, forward(model, loader_train, self.device)), dim=0)
-                X_out = torch.cat((X_out, forward(model, loader_test, self.device)), dim=0)
+                X_in = torch.cat((X_in, F.softmax(forward(model, loader_train, self.device), dim=-1)), dim=0)
+                X_out = torch.cat((X_out, F.softmax(forward(model, loader_test, self.device), dim=-1)), dim=0)
                 Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
                 Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
                 # Y_in = torch.cat((Y_in, torch.argmax(X_in, dim=-1)), dim=0)
                 # Y_out = torch.cat((Y_out, torch.argmax(X_out, dim=-1)), dim=0)
+            else:
+                model = model.fit(shadow_X_train, shadow_Y_train)
+                self.model_trained.append(model)
+                X_in = torch.cat((X_in, torch.from_numpy(model.predict_proba(shadow_X_train)).to(self.device)), dim=0)
+                X_out = torch.cat((X_out, torch.from_numpy(model.predict_proba(shadow_X_test)).to(self.device)), dim=0)
+                Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
+                Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
 
-        self.data = DataStruct(F.softmax(X_in, dim=-1), F.softmax(X_out, dim=-1), Y_in, Y_out)
+        self.data = DataStruct(X_in.float(), X_out.float(), Y_in, Y_out)
 
     def __getitem__(self, item):
         return self.model_trained[item]
