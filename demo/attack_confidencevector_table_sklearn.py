@@ -6,11 +6,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader
 
-from MIA.torch.AttackModels import ConfidenceVector
-from MIA.torch.ShadowModels import ShadowModels
-from MIA.torch.utils import trainset
+from MIA.sklearn.AttackModels import ConfidenceVector
+from MIA.sklearn.ShadowModels import ShadowModels
+from MIA.sklearn.utils import trainset
 from model import Model
 
 parser = argparse.ArgumentParser()
@@ -25,8 +26,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = Model(600)
-    net.to(device)
+    # net = Model(600)
+    # net.to(device)
+    net = KNeighborsClassifier()
 
     target = Model(600)
     target.to(device)

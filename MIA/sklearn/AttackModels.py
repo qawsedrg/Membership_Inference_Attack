@@ -12,16 +12,13 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as T
 from cleverhans.torch.attacks.hop_skip_jump_attack import hop_skip_jump_attack
-from cleverhans.torch.attacks.carlini_wagner_l2 import carlini_wagner_l2
 from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils.data import DataLoader
 from sklearn.cluster import KMeans
-from sklearn.cluster import SpectralClustering
-from sklearn.cluster import DBSCAN
 
-from MIA.ShadowModels import ShadowModels
-from MIA.utils import trainset, train, attackmodel, forward, get_threshold
+from MIA import ShadowModels
+from MIA import trainset, train, attackmodel, forward, get_threshold
 
 
 # todo 统一接口

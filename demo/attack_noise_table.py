@@ -7,9 +7,9 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import NoiseAttack
-from MIA.utils import trainset
-from MIA.ShadowModels import ShadowModels
+from MIA.torch.AttackModels import NoiseAttack
+from MIA.torch.utils import trainset
+from MIA.torch.ShadowModels import ShadowModels
 from model import Model
 
 parser = argparse.ArgumentParser()

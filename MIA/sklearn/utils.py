@@ -178,8 +178,3 @@ class augmentation_wrapper():
 
     def __call__(self, text):
         return self.aug(text, n=self.n, num_thread=multiprocessing.cpu_count())
-
-
-class sklearn_wrapper(nn.Module):
-    def __init__(self):
-        super().__init__()

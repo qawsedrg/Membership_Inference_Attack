@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from MIA.utils import trainset
+from MIA.torch.utils import trainset
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
