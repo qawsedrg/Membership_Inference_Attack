@@ -9,9 +9,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import ConfidenceVector
-from MIA.ShadowModels import ShadowModels
-from MIA.utils import trainset
+from MIA.sklearn.AttackModels import ConfidenceVector
+from MIA.sklearn.ShadowModels import ShadowModels
+from MIA.sklearn.utils import trainset
 from model import Model
 
 parser = argparse.ArgumentParser()
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # net = Model(600)
     # net.to(device)
-    net = KNeighborsClassifier(n_jobs=-1)
+    net = KNeighborsClassifier()
 
     target = Model(600)
     target.to(device)
