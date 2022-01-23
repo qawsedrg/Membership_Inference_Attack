@@ -64,7 +64,7 @@ class ConfidenceVector():
                         self.device)
                     attack_model = attackmodel(train_x.shape[-1])
                     attack_model.to(self.device)
-                    optimizer = optim.Adam(attack_model.parameters(), lr=0.001)
+                    optimizer = optim.Adam(attack_model.parameters(), lr=0.01)
                     loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
                     print("Training attack model for class {:}".format(i))
                     attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
@@ -90,7 +90,7 @@ class ConfidenceVector():
                 self.device)
             attack_model = attackmodel(train_x.shape[-1])
             attack_model.to(self.device)
-            optimizer = optim.Adam(attack_model.parameters(), lr=0.001)
+            optimizer = optim.Adam(attack_model.parameters(), lr=0.01)
             loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
             attack_model = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
                                  epoches=self.epoches)

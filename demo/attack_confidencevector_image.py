@@ -18,8 +18,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar10', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=10, type=int)
-parser.add_argument("--attack_nepoch", default=5, type=int)
+parser.add_argument("--shadow_nepoch", default=30, type=int)
+parser.add_argument("--attack_nepoch", default=15, type=int)
 parser.add_argument("--topx", default=-1, type=int)
 
 if __name__ == "__main__":
