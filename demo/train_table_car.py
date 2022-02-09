@@ -11,6 +11,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from MIA.utils import trainset, mix
 from model import Model
+from opacus.optimizers import DPOptimizer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
@@ -44,6 +45,13 @@ if __name__ == "__main__":
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
+
+    dp_optimzer = DPOptimizer(
+        optimizer=optimizer,
+        noise_multiplier=1.0,
+        max_grad_norm=1.0,
+        expected_batch_size=4,
+    )
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)
