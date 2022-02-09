@@ -14,7 +14,7 @@ from model import TextClassificationModel
 from MIA.utils import trainset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", default=10, type=int)
+parser.add_argument("--n_epochs", default=30, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='agnews', type=str)
@@ -34,6 +34,7 @@ if __name__ == "__main__":
 
     vocab = build_vocab_from_iterator(yield_tokens(train_iter), specials=["<unk>"])
     vocab.set_default_index(vocab["<unk>"])
+
 
     def collate_batch(batch):
         label_list, text_list, offsets = [], [], [0]
@@ -118,6 +119,7 @@ if __name__ == "__main__":
 
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
+        torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
         if val_acc > val_acc_max:
             val_acc_max = val_acc
-            torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+            # torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
