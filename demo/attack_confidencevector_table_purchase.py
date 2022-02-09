@@ -25,19 +25,28 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = Model(600)
+    net = Model(6)
     net.to(device)
 
-    target = Model(600)
+    target = Model(6)
     target.to(device)
     target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
     # todo: should be repalced by a hill-climbing and GAN
+    '''
     with open("../data/purchase_x", "rb") as f:
         X = pickle.load(f).astype(np.float32)
     with open("../data/purchase_y", "rb") as f:
         Y = pickle.load(f).astype(np.longlong)
     Y = np.squeeze(Y)
+    '''
+
+    with open("../data/car.txt", 'rb') as f:
+        car = pickle.load(f)
+    X = np.array(car[['buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety']]).astype(np.float32)
+    Y = np.array(car['class']).astype(np.longlong)
+    Y = np.squeeze(Y)
+
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
