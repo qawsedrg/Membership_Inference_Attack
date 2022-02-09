@@ -43,7 +43,7 @@ if __name__ == "__main__":
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=args.decay)
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)
