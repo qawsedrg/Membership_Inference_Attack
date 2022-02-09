@@ -9,8 +9,12 @@ import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from tqdm import tqdm
-from MIA.utils import trainset
+from MIA.utils import trainset, mix
 from model import Model
+
+with open("../data/car.txt", 'rb') as f:
+    car = pickle.load(f)
+    # print(car)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
@@ -21,25 +25,30 @@ parser.add_argument("--name", default='purchase', type=str, choices=["purchase",
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    with open("../data/purchase_x", "rb") as f:
-        X = pickle.load(f).astype(np.float32)
-    with open("../data/purchase_y", "rb") as f:
-        Y = pickle.load(f).astype(np.longlong)
+    #with open("../data/purchase_x", "rb") as f:
+        #X = pickle.load(f).astype(np.float32)
+    #with open("../data/purchase_y", "rb") as f:
+        #Y = pickle.load(f).astype(np.longlong)
 
-    Y = np.squeeze(Y)
+    X = np.array(car[['buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety']]).astype(np.float32)
+    # print(X)
+    Y = np.array(car['class'])
+    # print(Y)
+    # Y = np.squeeze(Y)
+
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_train_X, target_test_X, target_train_Y, target_test_Y = train_test_split(target_X, target_Y, test_size=0.5,
                                                                                     random_state=42)
     shadow_train_X, shadow_test_X, shadow_train_Y, shadow_test_Y = train_test_split(shadow_X, shadow_Y, test_size=0.5,
                                                                                     random_state=42)
 
-    trainloader = DataLoader(trainset(target_train_X, target_train_Y), batch_size=args.batch_size,
+    trainloader = DataLoader(trainset(*mix(target_train_X, target_train_Y, 1)), batch_size=args.batch_size,
                              shuffle=True)
     testloader = DataLoader(trainset(target_test_X, target_test_Y), batch_size=args.batch_size,
                             shuffle=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = Model(600)
+    net = Model(6)
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -57,11 +66,11 @@ if __name__ == "__main__":
             for i, data in t:
                 correct_items = 0
 
-                inputs, labels = data[0].to(device), data[1].to(device)
+                inputs, labels = data[0].to(device).long(), data[1].to(device).long()
 
                 optimizer.zero_grad()
 
-                outputs = net(inputs)
+                outputs = net(inputs.float())
                 correct_items += torch.sum(torch.argmax(outputs, dim=-1) == labels).item()
                 acc_batch = correct_items / args.batch_size
                 acc += acc_batch

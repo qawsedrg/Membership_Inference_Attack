@@ -9,7 +9,9 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 import multiprocessing
-import nlpaug.augmenter.word as naw
+import pandas as pd
+from snsynth.mwem import MWEMSynthesizer
+# import nlpaug.augmenter.word as naw
 
 
 class trainset(Dataset):
@@ -181,3 +183,25 @@ class augmentation_wrapper():
 
     def to(self, *args, **kwargs):
         pass
+
+
+def mix(X, Y, ratio):
+    """
+    data_in: 原始数据集，数据格式：np.ndarray，包括x和y
+    ratio: 输出数据集比例
+
+    data_out: 输出数据集，数据格式：np.ndarray
+    """
+
+    data = np.append(X, Y[:, np.newaxis], axis=1)
+    df = pd.DataFrame(data)
+    # print(X.shape[1])
+
+    synth = MWEMSynthesizer(3.0, 400, 40, 20, split_factor=X.shape[1] + 1, max_bin_count=400)
+    synth.fit(df)
+
+    synthetic = synth.sample(int(X.shape[0]) * ratio)
+    result = pd.concat([df, synthetic])
+    out = np.array(result)
+
+    return out[:, :-1], out[:, -1]
