@@ -17,6 +17,29 @@ parser.add_argument("--n_epochs", default=50, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='purchase', type=str, choices=["purchase", "location", "adult"], )
+parser.add_argument('--alpha', default=1., type=float, help='interpolation strength (uniform=1., ERM=0.)') #后加，下面两个函数也是
+parser.add_argument('--decay', default=1e-4, type=float, help='weight decay (default=1e-4)')
+args = parser.parse_args()
+
+def mixup_data(x, y, alpha=1.0, use_cuda=True):
+
+    '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0.:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index,:]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+def mixup_criterion(y_a, y_b, lam):
+    return lambda criterion, pred: lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -58,7 +81,7 @@ if __name__ == "__main__":
                 correct_items = 0
 
                 inputs, labels = data[0].to(device), data[1].to(device)
-
+                inputs, labels_a, labels_b, lam = mixup_data(inputs, labels, args.alpha, torch.cuda.is_available())
                 optimizer.zero_grad()
 
                 outputs = net(inputs)
@@ -66,7 +89,8 @@ if __name__ == "__main__":
                 acc_batch = correct_items / args.batch_size
                 acc += acc_batch
 
-                loss = criterion(outputs, labels)
+                loss_func = mixup_criterion(labels_a, labels_b, lam)
+                loss = loss_func(criterion, outputs)
                 loss.backward()
                 optimizer.step()
 
@@ -90,6 +114,8 @@ if __name__ == "__main__":
 
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
+    '''
         if val_acc > val_acc_max:
             val_acc_max = val_acc
             torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+'''
