@@ -18,6 +18,7 @@ parser.add_argument("--n_epochs", default=30, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='agnews', type=str)
+parser.add_argument('--decay', default=1e-2, type=float, help='weight decay (default=1e-2)')
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -56,7 +57,7 @@ if __name__ == "__main__":
     model = TextClassificationModel(vocab_size, emsize, num_class).to(device)
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=5)
+    optimizer = torch.optim.SGD(model.parameters(), lr=5, weight_decay=args.decay)
 
     train_iter, test_iter = AG_NEWS()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
