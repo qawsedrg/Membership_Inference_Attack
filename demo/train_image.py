@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
                 inputs, labels = data[0].to(device), data[1].to(device)
                 if args.mixup:
-                    inputs, labels_a, labels_b, lam = mixup_data(inputs, labels, args.alpha, torch.cuda.is_available())
+                    inputs, labels_a, labels_b, lam = mixup_data(inputs, labels, args.alpha, device)
                     optimizer.zero_grad()
                     outputs = net(inputs)
                     loss_func = mixup_criterion(labels_a, labels_b, lam)

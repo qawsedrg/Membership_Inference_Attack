@@ -88,6 +88,22 @@ def forward(model, loader, device):
     return result
 
 
+def forward_sklearn(model, loader, device):
+    result = torch.Tensor()
+    with torch.no_grad():
+        for i, data in tqdm(enumerate(loader, 0), total=len(loader)):
+            if i > 10:
+                break
+            if type(data) is torch.Tensor:
+                inputs = data.cpu()
+                outputs = torch.from_numpy(model.predict_proba(inputs))
+            else:
+                inputs = [d.cpu() for d in data[:-1]]
+                outputs = torch.from_numpy(model.predict_proba(*inputs))
+            result = torch.cat((result, outputs), dim=0)
+    return result.float().to(device)
+
+
 class DataStruct():
     def __init__(self, data_in, data_out, target_in, target_out):
         self.data_in = data_in
@@ -184,17 +200,15 @@ class augmentation_wrapper():
         pass
 
 
-def mixup_data(x, y, alpha=1.0, use_cuda=True):
+def mixup_data(x, y, alpha, device):
     '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
     if alpha > 0.:
         lam = np.random.beta(alpha, alpha)
     else:
         lam = 1.
     batch_size = x.size()[0]
-    if use_cuda:
-        index = torch.randperm(batch_size).cuda()
-    else:
-        index = torch.randperm(batch_size)
+
+    index = torch.randperm(batch_size).to(device)
 
     mixed_x = lam * x + (1 - lam) * x[index, :]
     y_a, y_b = y, y[index]

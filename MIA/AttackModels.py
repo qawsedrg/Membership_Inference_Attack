@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from sklearn.cluster import KMeans
 
 from MIA import ShadowModels
-from MIA.utils import trainset, train, attackmodel, forward, get_threshold
+from MIA.utils import trainset, train, attackmodel, forward, get_threshold, forward_sklearn
 
 
 # todo 统一接口
@@ -147,46 +147,31 @@ class ConfidenceVector():
         plt.show()
     '''
 
-    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+    def evaluate(self, target: Optional = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
 
         if target is not None:
-            if self.topx == -1:
-                target.to(self.device)
-                loader = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False,
-                                    collate_fn=self.collate_fn)
-                output_in = forward(target, loader, self.device)
-                loader = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False,
-                                    collate_fn=self.collate_fn)
-                output_out = forward(target, loader, self.device)
-                _, _, result_in = self(F.softmax(output_in, dim=-1))
-                _, _, result_out = self(F.softmax(output_out, dim=-1))
-                correct = 0
-                correct += torch.sum((result_in > 0.5)).cpu().numpy()
-                correct += torch.sum((result_out < 0.5)).cpu().numpy()
-                print(
-                    "acc : {:.2f}".format(
-                        correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
-            else:
-                target.to(self.device)
-                loader = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False,
-                                    collate_fn=self.collate_fn)
-                output_in = forward(target, loader, self.device)
-                output_in = torch.sort(output_in, dim=-1)[0][:, -self.topx:]
-                loader = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False,
-                                    collate_fn=self.collate_fn)
-                output_out = forward(target, loader, self.device)
-                output_out = torch.sort(output_out, dim=-1)[0][:, -self.topx:]
-                _, _, result_in = self(F.softmax(output_in, dim=-1))
-                _, _, result_out = self(F.softmax(output_out, dim=-1))
-                correct = 0
-                correct += torch.sum((result_in > 0.5)).cpu().numpy()
-                correct += torch.sum((result_out < 0.5)).cpu().numpy()
-                print(
-                    "acc : {:.2f}".format(
-                        correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
+            loader = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False,
+                                collate_fn=self.collate_fn)
+            output_in = forward(target, loader, self.device) if isinstance(target, nn.Module) else forward_sklearn(
+                target, loader, self.device)
+            loader = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False,
+                                collate_fn=self.collate_fn)
+            output_out = forward(target, loader, self.device) if isinstance(target, nn.Module) else forward_sklearn(
+                target, loader, self.device)
+            if self.topx != -1:
+                output_in = output_in[0][:, -self.topx:]
+                output_out = output_out[0][:, -self.topx:]
+            _, _, result_in = self(F.softmax(output_in, dim=-1) if isinstance(target, nn.Module) else output_in)
+            _, _, result_out = self(F.softmax(output_out, dim=-1) if isinstance(target, nn.Module) else output_out)
+            correct = 0
+            correct += torch.sum((result_in > 0.5)).cpu().numpy()
+            correct += torch.sum((result_out < 0.5)).cpu().numpy()
+            print(
+                "acc : {:.2f}".format(
+                    correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
         else:
             if self.topx == -1:
                 correct = 0
