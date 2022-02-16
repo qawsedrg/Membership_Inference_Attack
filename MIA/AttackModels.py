@@ -421,12 +421,14 @@ class NoiseAttack():
     @staticmethod
     def train_base(loader, model, stddev, noise_samples, device):
         num_in = []
-        model.to(device)
+        if isinstance(model, nn.Module):
+            model.to(device)
         with tqdm(enumerate(loader, 0), total=len(loader)) as t:
             for _, data in t:
                 xbatch, ybatch = data[0].to(device), data[1].to(device)
                 with torch.no_grad():
-                    y_pred = F.softmax(model(xbatch), dim=-1)
+                    y_pred = F.softmax(model(xbatch), dim=-1) if isinstance(model, nn.Module) else torch.from_numpy(
+                        model.predict_proba(xbatch.cpu())).to(device)
                 x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
                 y_selected = ybatch[torch.argmax(y_pred, dim=-1) == ybatch]
                 num_in.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
@@ -440,12 +442,14 @@ class NoiseAttack():
                         b_size = 100
                         with torch.no_grad():
                             for j in range(noise_samples // b_size + 1):
-                                y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
+                                y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1) if isinstance(
+                                    model, nn.Module) else torch.from_numpy(
+                                    model.predict_proba(x_noisy[j * b_size:(j + 1) * b_size])).to(device)
                                 n += torch.sum(torch.argmax(y_pred, dim=-1) == y_selected[i]).item()
                     num_in.append(n / noise_samples)
         return num_in
 
-    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+    def evaluate(self, target: Optional = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
