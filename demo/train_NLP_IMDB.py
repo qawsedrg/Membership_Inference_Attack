@@ -2,7 +2,7 @@ import argparse
 import os.path
 
 import torch
-from torchtext.datasets import AG_NEWS
+from torchtext.datasets import IMDB
 from torchtext.data.utils import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
 from torch.utils.data import DataLoader
@@ -17,14 +17,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=30, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='agnews', type=str)
+parser.add_argument("--name", default='imdb', type=str)
 parser.add_argument('--decay', default=1e-2, type=float, help='weight decay (default=1e-2)')
 
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    train_iter = AG_NEWS(split='train')
+    train_iter = IMDB(split='train')
     tokenizer = get_tokenizer('basic_english')
 
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         return text_list, offsets, label_list
 
 
-    num_class = len(set([label for (label, text) in AG_NEWS(split='train')]))
+    num_class = len(set([label for (label, text) in IMDB(split='train')]))
     vocab_size = len(vocab)
     emsize = 64
     model = TextClassificationModel(vocab_size, emsize, num_class).to(device)
@@ -59,10 +59,11 @@ if __name__ == "__main__":
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=5)
 
-    train_iter, test_iter = AG_NEWS()
+    train_iter, test_iter = IMDB()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
-    train_iter, test_iter = AG_NEWS()
-    Y = np.concatenate(([tup[0] for tup in list(train_iter)], [tup[0] for tup in list(test_iter)])).astype(np.int64) - 1
+    train_iter, test_iter = IMDB()
+    Y = np.concatenate(([0 if tup[0] == "neg" else 1 for tup in list(train_iter)],
+                        [0 if tup[0] == "neg" else 1 for tup in list(test_iter)])).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,
                                                                                     random_state=42)
