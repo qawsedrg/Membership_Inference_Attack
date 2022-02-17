@@ -289,7 +289,7 @@ class Augmentation():
         self.device = device
         # RandAugment ?
         self.trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))] if trans == None else trans
-        self.times = [3 for _ in range(len(self.trans))] if times == None else times
+        self.times = [1 for _ in range(len(self.trans))] if times == None else times
         assert len(self.times) == len(self.trans)
         self.acc_thresh = 0
         self.pre_thresh = 0
@@ -318,15 +318,11 @@ class Augmentation():
         # 效果好吗？
         # 先tsne再分类？
         kmeans = KMeans(n_clusters=2, random_state=0).fit(data_x)
-        # kmeans=SpectralClustering(n_clusters=2, affinity='nearest_neighbors',
-        #                   assign_labels='kmeans').fit(data_x)
         acc = np.sum(kmeans.labels_ == data_y) / len(data_y)
         if acc < 0.5:
             data_y = 1 - data_y
         acc = np.sum(kmeans.labels_ == data_y) / len(data_y)
-        prec = np.sum(
-            [(kmeans.labels_ == 1)[i] and (kmeans.labels_ == data_y)[i] for i in range(len(data_y))]) / np.sum(
-            kmeans.labels_)
+        prec = np.sum((kmeans.labels_ == 1) * (kmeans.labels_ == data_y)) / np.sum(kmeans.labels_ == 1)
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
         if show:
             fig = plt.figure()
