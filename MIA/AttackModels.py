@@ -289,7 +289,7 @@ class Augmentation():
         self.device = device
         # RandAugment ?
         self.trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))] if trans == None else trans
-        self.times = [1 for _ in range(len(self.trans))] if times == None else times
+        self.times = [5 for _ in range(len(self.trans))] if times == None else times
         assert len(self.times) == len(self.trans)
         self.acc_thresh = 0
         self.pre_thresh = 0
@@ -315,8 +315,6 @@ class Augmentation():
         data_x = np.concatenate((data_x_in, data_x_out), axis=0)
         data_y = np.concatenate((np.ones(data_x_in.shape[0]), np.zeros(data_x_out.shape[0])))
         # 要改用监督学习吗，万一都是in，然后硬是分成两部分导致准确率低
-        # 效果好吗？
-        # 先tsne再分类？
         kmeans = KMeans(n_clusters=2, random_state=0).fit(data_x)
         acc = np.sum(kmeans.labels_ == data_y) / len(data_y)
         if acc < 0.5:
@@ -361,9 +359,8 @@ class Augmentation():
                         if isinstance(data[0], torch.Tensor):
                             data = tran(data[0].to(self.device)), data[1].to(self.device)
                         else:
-                            auged = tran(data[0][0])
-                            data = [(auged[i], data[1].to(self.device)) for i in range(tran.n)]
-                            data = self.collate_fn(data)
+                            auged = tran(list(data[0]))
+                            data = self.collate_fn(list(zip(auged, data[1])))
                         with torch.no_grad():
                             data = [d.to(self.device) for d in data]
                             xbatch = data[:-1]

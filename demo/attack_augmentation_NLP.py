@@ -69,14 +69,13 @@ if __name__ == "__main__":
 
     aug1 = naw.WordEmbsAug(
         model_type='glove', model_path='D:\PSC\Membership_Inference_Attack\demo\glove.6B.50d.txt',
-        action="substitute", aug_max=5, aug_min=2, aug_p=.5)
-    aug2 = naw.BackTranslationAug(device="cuda")
-    aug3 = naw.ContextualWordEmbsAug(device="cuda")
-    aug4 = naw.RandomWordAug()  # fast
+        action="substitute", aug_max=5, aug_min=2, aug_p=.5)  # 20min
+    aug2 = naw.BackTranslationAug(device="cuda")  # 3h#out of memory
+    aug3 = naw.ContextualWordEmbsAug(device="cuda")  # 1h30
+    aug4 = naw.RandomWordAug()  # 5min
 
-    trans = [augmentation_wrapper(aug1, 5), augmentation_wrapper(aug2, 5), augmentation_wrapper(aug3, 5),
-             augmentation_wrapper(aug4, 5)]
+    trans = [augmentation_wrapper(aug4, 1)]
 
-    attack_model = Augmentation(device, trans=trans, batch_size=1, collate_fn=collate_batch)
+    attack_model = Augmentation(device, trans=trans, batch_size=64, collate_fn=collate_batch)
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=True)
     membership = attack_model(target, target_X, target_Y)
