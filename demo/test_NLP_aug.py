@@ -1,3 +1,4 @@
+import os
 import torch
 import argparse
 from torchtext.datasets import AG_NEWS
@@ -18,6 +19,8 @@ parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='agnews', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
 parser.add_argument("--shadow_nepoch", default=15, type=int)
+parser.add_argument("--batch_size", default=64, type=int)
+parser.add_argument("--max_iter", default=20, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -54,6 +57,7 @@ if __name__ == "__main__":
     vocab_size = len(vocab)
     emsize = 64
     model = TextClassificationModel(vocab_size, emsize, num_class).to(device)
+    model.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=5)
@@ -69,17 +73,19 @@ if __name__ == "__main__":
     trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
                              shuffle=True)
     testloader = DataLoader(trainset(target_X_test, target_Y_test), batch_size=args.batch_size,
-                            shuffle=False)
+                            shuffle=True)
 
-    for p in [i / 10 for i in range(10)]:
-        aug = naw.RandomWordAug(aug_p=p, aug_min=5, aug_max=10)
+    acc_list = []
+    for p in [i / 20 for i in range(10)]:
+        aug = naw.RandomWordAug(aug_p=p, aug_min=0, aug_max=100)
         with torch.no_grad():
             val_acc = 0
-            with tqdm(enumerate(trainloader, 0), total=len(trainloader)) as t:
+            with tqdm(enumerate(trainloader, 0), total=args.max_iter) as t:
                 for i, data in t:
                     correct_items = 0
                     auged = aug.augment(list(data[0]), num_thread=12)
                     data = collate_batch(list(zip(auged, data[1])))
+                    data = [d.to(device) for d in data]
                     label = data[-1]
 
                     outputs = model(*data[:-1])
@@ -88,4 +94,8 @@ if __name__ == "__main__":
                     val_acc += val_acc_batch
 
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
-            print(val_acc)
+                    if i > args.max_iter:
+                        acc_list.append(str(val_acc / (i + 1)) + '\n')
+                        break
+    with open("RandomWordAug_p", 'w') as f:
+        f.writelines(acc_list)
