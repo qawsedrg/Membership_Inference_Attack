@@ -3,6 +3,7 @@ import pickle
 import os.path
 import argparse
 import numpy as np
+import pandas
 from sklearn.model_selection import train_test_split
 from torch import nn
 import torch
@@ -11,22 +12,25 @@ import torch.optim as optim
 from tqdm import tqdm
 from MIA.utils import trainset, mix
 from model import Model
-from opacus.optimizers import DPOptimizer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
-parser.add_argument("--batch_size", default=64, type=int)
+parser.add_argument("--batch_size", default=20, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='purchase', type=str, choices=["purchase", "location", "adult"], )
+parser.add_argument('--decay', default=1e-2, type=float, help='weight decay (default=1e-2)')
 
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    with open("../data/car.txt", 'rb') as f:
-        car = pickle.load(f)
+    iris = pandas.read_csv("../data/archive/Iris.csv")
 
-    X = np.array(car[['buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety']]).astype(np.float32)
-    Y = np.array(car['class'])
+    labels = {'Iris-setosa': 0, 'Iris-versicolor': 1, 'Iris-virginica': 2}
+    iris['IrisType_num'] = iris['Species']  # Create a new column "IrisType_num"
+    iris.IrisType_num = [labels[item] for item in iris.IrisType_num]  # Convert the values to numeric ones
+
+    X = np.array(iris[['SepalLengthCm', 'SepalWidthCm', 'PetalLengthCm', 'PetalWidthCm']]).astype(np.float32)
+    Y = np.array(iris['IrisType_num']).astype(np.longlong)
 
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_train_X, target_test_X, target_train_Y, target_test_Y = train_test_split(target_X, target_Y, test_size=0.5,
@@ -40,18 +44,11 @@ if __name__ == "__main__":
                             shuffle=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = Model(6)
+    net = Model(4)
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
-
-    dp_optimzer = DPOptimizer(
-        optimizer=optimizer,
-        noise_multiplier=1.0,
-        max_grad_norm=1.0,
-        expected_batch_size=4,
-    )
+    optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=args.decay)
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)
@@ -98,6 +95,8 @@ if __name__ == "__main__":
 
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
+'''
         if val_acc > val_acc_max:
             val_acc_max = val_acc
             torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+'''

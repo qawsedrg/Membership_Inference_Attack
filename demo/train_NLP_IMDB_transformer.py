@@ -3,60 +3,35 @@ import os.path
 
 import torch
 from torchtext.datasets import IMDB
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import numpy as np
+from transformers import BertForSequenceClassification
+from transformers import BertTokenizer
+from transformers import AdamW
 
-from model import TextClassificationModel
 from MIA.utils import trainset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=30, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='imdb', type=str)
+parser.add_argument("--name", default='imdb_transformer', type=str)
 
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    train_iter = IMDB(split='train')
-    tokenizer = get_tokenizer('basic_english')
-
-
-    def yield_tokens(data_iter):
-        for _, text in data_iter:
-            yield tokenizer(text)
-
-
-    vocab = build_vocab_from_iterator(yield_tokens(train_iter), specials=["<unk>"])
-    vocab.set_default_index(vocab["<unk>"])
-
-
-    def collate_batch(batch):
-        label_list, text_list, offsets = [], [], [0]
-        for (_text, _label) in batch:
-            label_list.append(int(_label))
-            processed_text = torch.tensor(vocab(tokenizer(_text)), dtype=torch.int64)
-            text_list.append(processed_text)
-            # 用每个batch的前batchsize个元素作为分割点，长句被分割，点间段落求mean，embedd层输出为batchsize*embedsize
-            offsets.append(processed_text.size(0))
-        label_list = torch.tensor(label_list, dtype=torch.int64)
-        offsets = torch.tensor(offsets[:-1]).cumsum(dim=0)
-        text_list = torch.cat(text_list)
-        return text_list, offsets, label_list
-
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     num_class = len(set([label for (label, text) in IMDB(split='train')]))
-    vocab_size = len(vocab)
-    emsize = 64
-    model = TextClassificationModel(vocab_size, emsize, num_class).to(device)
+    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', return_dict=True,
+                                                          num_labels=num_class).to(device)
+    for param in model.base_model.parameters():
+        param.requires_grad = False
 
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=5)
+    optimizer = AdamW(model.parameters(), lr=1e-5)
 
     train_iter, test_iter = IMDB()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
@@ -68,9 +43,9 @@ if __name__ == "__main__":
                                                                                     random_state=42)
 
     trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
-                             shuffle=True, collate_fn=collate_batch)
+                             shuffle=True)
     testloader = DataLoader(trainset(target_X_test, target_Y_test), batch_size=args.batch_size,
-                            shuffle=False, collate_fn=collate_batch)
+                            shuffle=False)
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)
@@ -82,20 +57,22 @@ if __name__ == "__main__":
         epoch_loss = 0
         acc = 0
         with tqdm(enumerate(trainloader, 0), total=len(trainloader)) as t:
-            for i, data in t:
+            for i, (text, label) in t:
                 correct_items = 0
-                data = [d.to(device) for d in data]
-                label = data[-1]
+                encoding = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
+                input_ids = encoding['input_ids'].to(device)
+                attention_mask = encoding['attention_mask'].to(device)
+                label = label.to(device)
 
                 optimizer.zero_grad()
 
-                outputs = model(*data[:-1])
+                outputs = model(input_ids, attention_mask=attention_mask, labels=label)
 
-                correct_items += torch.sum(torch.argmax(outputs, dim=-1) == label).item()
+                correct_items += torch.sum(torch.argmax(outputs.logits, dim=-1) == label).item()
                 acc_batch = correct_items / args.batch_size
                 acc += acc_batch
 
-                loss = criterion(outputs, label)
+                loss = outputs.loss
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
                 optimizer.step()
@@ -110,11 +87,14 @@ if __name__ == "__main__":
             with tqdm(enumerate(testloader, 0), total=len(testloader)) as t:
                 for i, data in t:
                     correct_items = 0
-                    data = [d.to(device) for d in data]
-                    label = data[-1]
+                    encoding = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
+                    input_ids = encoding['input_ids'].to(device)
+                    attention_mask = encoding['attention_mask'].to(device)
+                    label = label.to(device)
 
-                    outputs = model(*data[:-1])
-                    correct_items += torch.sum(torch.argmax(outputs, dim=-1) == label).item()
+                    outputs = model(input_ids, attention_mask=attention_mask, labels=label)
+
+                    correct_items += torch.sum(torch.argmax(outputs.logits, dim=-1) == label).item()
                     val_acc_batch = correct_items / args.batch_size
                     val_acc += val_acc_batch
 

@@ -3,14 +3,16 @@ import pickle
 import os.path
 import argparse
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from torch import nn
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from tqdm import tqdm
 from MIA.utils import trainset, mix
-from model import Model
+from model import Model1
 from opacus.optimizers import DPOptimizer
 
 parser = argparse.ArgumentParser()
@@ -22,11 +24,18 @@ parser.add_argument("--name", default='purchase', type=str, choices=["purchase",
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    with open("../data/car.txt", 'rb') as f:
-        car = pickle.load(f)
 
-    X = np.array(car[['buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety']]).astype(np.float32)
-    Y = np.array(car['class'])
+    data = pd.read_csv('../data/stroke.csv', nrows=600)
+    data = data[['gender', 'age', 'hypertension', 'heart_disease', 'ever_married', 'work_type', 'Residence_type',
+                 'avg_glucose_level', 'bmi', 'smoking_status', 'stroke']].dropna()
+    le = LabelEncoder()
+    for i in data.columns:
+        data[i] = le.fit_transform(data[i])
+    print(data)
+
+    X = np.array(data[['gender', 'age', 'hypertension', 'heart_disease', 'ever_married', 'work_type',
+                       'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status']]).astype(np.float32)
+    Y = np.array(data['stroke'])
 
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_train_X, target_test_X, target_train_Y, target_test_Y = train_test_split(target_X, target_Y, test_size=0.5,
@@ -34,13 +43,13 @@ if __name__ == "__main__":
     shadow_train_X, shadow_test_X, shadow_train_Y, shadow_test_Y = train_test_split(shadow_X, shadow_Y, test_size=0.5,
                                                                                     random_state=42)
 
-    trainloader = DataLoader(trainset(*mix(target_train_X, target_train_Y, 1)), batch_size=args.batch_size,
+    trainloader = DataLoader(trainset(target_train_X, target_train_Y), batch_size=args.batch_size,
                              shuffle=True)
     testloader = DataLoader(trainset(target_test_X, target_test_Y), batch_size=args.batch_size,
                             shuffle=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = Model(6)
+    net = Model1(10)
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()

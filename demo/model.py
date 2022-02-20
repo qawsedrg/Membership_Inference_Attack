@@ -23,11 +23,11 @@ class CIFAR(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, n, p=0):
+    def __init__(self, in_n, out_n=100, p=0):
         super().__init__()
-        self.fc1 = nn.Linear(n, 1024)
+        self.fc1 = nn.Linear(in_n, 1024)
         self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, 100)
+        self.fc3 = nn.Linear(512, out_n)
         self.dropout = nn.Dropout(p)
 
     def forward(self, x):
