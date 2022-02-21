@@ -1,9 +1,7 @@
-# confidence boudary
-import pickle
 import os.path
 import argparse
 import numpy as np
-import pandas
+from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from torch import nn
 import torch
@@ -17,20 +15,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
 parser.add_argument("--batch_size", default=20, type=int)
 parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='purchase', type=str, choices=["purchase", "location", "adult"], )
+parser.add_argument("--name", default='iris', type=str, choices=["purchase", "location", "adult"], )
 parser.add_argument('--decay', default=1e-2, type=float, help='weight decay (default=1e-2)')
 
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    iris = pandas.read_csv("../data/archive/Iris.csv")
 
-    labels = {'Iris-setosa': 0, 'Iris-versicolor': 1, 'Iris-virginica': 2}
-    iris['IrisType_num'] = iris['Species']  # Create a new column "IrisType_num"
-    iris.IrisType_num = [labels[item] for item in iris.IrisType_num]  # Convert the values to numeric ones
-
-    X = np.array(iris[['SepalLengthCm', 'SepalWidthCm', 'PetalLengthCm', 'PetalWidthCm']]).astype(np.float32)
-    Y = np.array(iris['IrisType_num']).astype(np.longlong)
+    iris = datasets.load_iris()
+    X = iris.data.astype(np.float32)
+    Y = iris.target.astype(np.longlong)
 
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_train_X, target_test_X, target_train_Y, target_test_Y = train_test_split(target_X, target_Y, test_size=0.5,
@@ -44,7 +38,7 @@ if __name__ == "__main__":
                             shuffle=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = Model(4)
+    net = Model(4, 3)
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -95,6 +89,8 @@ if __name__ == "__main__":
 
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
+
+        torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
 '''
         if val_acc > val_acc_max:
             val_acc_max = val_acc
