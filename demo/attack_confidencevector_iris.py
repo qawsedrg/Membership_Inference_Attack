@@ -45,6 +45,7 @@ if __name__ == "__main__":
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 
+
     loader = DataLoader(trainset(target_X), batch_size=1024, shuffle=False)
     membership = torch.Tensor().to(device)
     confidence_vectors = torch.Tensor().to(device)

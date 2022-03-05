@@ -151,7 +151,7 @@ class ConfidenceVector():
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None):
-
+        result = 0
         if target is not None:
             loader = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False,
                                 collate_fn=self.collate_fn)
@@ -169,6 +169,7 @@ class ConfidenceVector():
             correct = 0
             correct += torch.sum((result_in > 0.5)).cpu().numpy()
             correct += torch.sum((result_out < 0.5)).cpu().numpy()
+            result = correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])
             print(
                 "acc : {:.2f}".format(
                     correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
@@ -187,6 +188,7 @@ class ConfidenceVector():
                     for data in loader:
                         with torch.no_grad():
                             correct += torch.sum((attack_model(data[0]) > 0.5).float() == data[1]).cpu().numpy()
+                result = correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])
                 print(
                     "acc : {:.2f}".format(
                         correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
@@ -203,9 +205,12 @@ class ConfidenceVector():
                 for data in loader:
                     with torch.no_grad():
                         correct += torch.sum((attack_model(data[0]) > 0.5).float() == data[1]).cpu().numpy()
+
+                result = correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])
                 print(
                     "acc : {:.2f}".format(
                         correct / (self.shadowdata.data_in.shape[0] + self.shadowdata.data_out.shape[0])))
+        return result
 
 
 class BoundaryDistance():

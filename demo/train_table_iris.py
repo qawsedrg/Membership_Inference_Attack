@@ -32,10 +32,8 @@ if __name__ == "__main__":
     shadow_train_X, shadow_test_X, shadow_train_Y, shadow_test_Y = train_test_split(shadow_X, shadow_Y, test_size=0.5,
                                                                                     random_state=42)
 
-    trainloader = DataLoader(trainset(target_train_X, target_train_Y), batch_size=args.batch_size,
-                             shuffle=True)
-    testloader = DataLoader(trainset(target_test_X, target_test_Y), batch_size=args.batch_size,
-                            shuffle=False)
+    trainloader = DataLoader(trainset(target_train_X, target_train_Y), batch_size=args.batch_size, shuffle=True)
+    testloader = DataLoader(trainset(target_test_X, target_test_Y), batch_size=args.batch_size, shuffle=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     net = Model(4, 3)
