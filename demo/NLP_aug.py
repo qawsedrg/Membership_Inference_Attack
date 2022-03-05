@@ -9,7 +9,10 @@ from sklearn.model_selection import train_test_split
 import nlpaug.augmenter.word as naw
 from tqdm import tqdm
 import numpy as np
+from multiprocessing.pool import ThreadPool
+import multiprocessing
 import nlpaug.augmenter.sentence as nas
+import csv
 
 from model import TextClassificationModel
 from MIA.utils import trainset
@@ -20,7 +23,9 @@ parser.add_argument("--name", default='agnews', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
 parser.add_argument("--shadow_nepoch", default=15, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
-parser.add_argument("--max_iter", default=20, type=int)
+parser.add_argument("--max_iter", default=10, type=int)
+parser.add_argument("--num", default=multiprocessing.cpu_count() * 10, type=int)
+parser.add_argument("--iter", default=10, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -59,9 +64,6 @@ if __name__ == "__main__":
     model = TextClassificationModel(vocab_size, emsize, num_class).to(device)
     model.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=5)
-
     train_iter, test_iter = AG_NEWS()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
     train_iter, test_iter = AG_NEWS()
@@ -69,33 +71,51 @@ if __name__ == "__main__":
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,
                                                                                     random_state=42)
-
+    '''
     trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
                              shuffle=True)
     testloader = DataLoader(trainset(target_X_test, target_Y_test), batch_size=args.batch_size,
                             shuffle=True)
+    '''
+    for _ in range(args.iter):
+        acc_list = []
 
-    acc_list = []
-    for p in [i / 20 for i in range(10)]:
-        aug = naw.RandomWordAug(aug_p=p, aug_min=0, aug_max=100)
-        with torch.no_grad():
-            val_acc = 0
-            with tqdm(enumerate(trainloader, 0), total=args.max_iter) as t:
-                for i, data in t:
-                    correct_items = 0
-                    auged = aug.augment(list(data[0]), num_thread=12)
-                    data = collate_batch(list(zip(auged, data[1])))
-                    data = [d.to(device) for d in data]
-                    label = data[-1]
 
-                    outputs = model(*data[:-1])
-                    correct_items += torch.sum(torch.argmax(outputs, dim=-1) == label).item()
-                    val_acc_batch = correct_items / args.batch_size
-                    val_acc += val_acc_batch
+        def f(p):
+            aug = naw.RandomWordAug(action='swap', aug_p=p, aug_min=0, aug_max=100)
+            with torch.no_grad():
+                val_acc = 0
+                trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
+                                         shuffle=True)
+                with tqdm(enumerate(trainloader, 0), total=args.max_iter) as t:
+                    for i, data in t:
+                        correct_items = 0
+                        auged = aug.augment(list(data[0]), num_thread=12)
+                        data = collate_batch(list(zip(auged, data[1])))
+                        data = [d.to(device) for d in data]
+                        label = data[-1]
 
-                    t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
-                    if i > args.max_iter:
-                        acc_list.append(str(val_acc / (i + 1)) + '\n')
-                        break
-    with open("RandomWordAug_p", 'w') as f:
-        f.writelines(acc_list)
+                        outputs = model(*data[:-1])
+                        correct_items += torch.sum(torch.argmax(outputs, dim=-1) == label).item()
+                        val_acc_batch = correct_items / args.batch_size
+                        val_acc += val_acc_batch
+
+                        t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
+                        if i > args.max_iter:
+                            return val_acc / (i + 1)
+
+
+        numberOfThreads = multiprocessing.cpu_count()
+        pool = ThreadPool(processes=numberOfThreads)
+        l = [i / (args.num * 2) for i in range(args.num)]
+        Chunks = np.array_split(l, len(l))
+        results = pool.map_async(f, Chunks)
+        pool.close()
+        pool.join()
+        for result in results.get():
+            acc_list.append(result)
+
+        with open("swap_rnn", 'a') as f:
+            writer = csv.writer(f)
+            for i in range(len(l)):
+                writer.writerow([l[i], acc_list[i]])

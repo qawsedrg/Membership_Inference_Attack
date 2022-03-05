@@ -32,7 +32,7 @@ if __name__ == "__main__":
     shadow_train_X, shadow_test_X, shadow_train_Y, shadow_test_Y = train_test_split(shadow_X, shadow_Y, test_size=0.5,
                                                                                     random_state=42)
 
-    trainloader = DataLoader(trainset(*mix(target_train_X, target_train_Y, 1)), batch_size=args.batch_size,
+    trainloader = DataLoader(trainset(target_train_X, target_train_Y), batch_size=args.batch_size,
                              shuffle=True)
     testloader = DataLoader(trainset(target_test_X, target_test_Y), batch_size=args.batch_size,
                             shuffle=False)
@@ -42,7 +42,8 @@ if __name__ == "__main__":
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=args.decay)
+    # optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=args.decay)
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)

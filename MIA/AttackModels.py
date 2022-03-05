@@ -382,8 +382,8 @@ class NoiseAttack():
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
-        self.stddev = [0.005, 0.01, 0.03, 0.05, 0.07, 0.1]
-        self.noisesamples = 50
+        self.stddev = np.linspace(1e-3, 1e-1, 100)
+        self.noisesamples = 100
         self.transform = transform
 
     def train(self, show=False):
@@ -431,7 +431,8 @@ class NoiseAttack():
                     for dev in stddev:
                         noise = torch.from_numpy(dev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(device)
                         # 注意范围
-                        x_noisy = torch.clamp(x_selected[i, :] + noise, 0, 1).float()
+                        # x_noisy = torch.clamp(x_selected[i, :] + noise, 0, 1).float()
+                        x_noisy = (x_selected[i, :] + noise).float()
                         b_size = 100
                         with torch.no_grad():
                             for j in range(noise_samples // b_size + 1):

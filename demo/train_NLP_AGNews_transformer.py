@@ -84,7 +84,7 @@ if __name__ == "__main__":
         val_acc = 0
         with torch.no_grad():
             with tqdm(enumerate(testloader, 0), total=len(testloader)) as t:
-                for i, data in t:
+                for i, (text, label) in t:
                     correct_items = 0
                     encoding = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
                     input_ids = encoding['input_ids'].to(device)
