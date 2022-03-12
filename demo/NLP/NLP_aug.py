@@ -22,10 +22,10 @@ parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='agnews', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
 parser.add_argument("--shadow_nepoch", default=15, type=int)
-parser.add_argument("--batch_size", default=64, type=int)
-parser.add_argument("--max_iter", default=10, type=int)
-parser.add_argument("--num", default=multiprocessing.cpu_count() * 10, type=int)
-parser.add_argument("--iter", default=10, type=int)
+parser.add_argument("--batch_size", default=32, type=int)
+parser.add_argument("--max_iter", default=5, type=int)
+parser.add_argument("--num", default=multiprocessing.cpu_count() * 5, type=int)
+parser.add_argument("--iter", default=5, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -71,18 +71,15 @@ if __name__ == "__main__":
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
     target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,
                                                                                     random_state=42)
-    '''
-    trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
-                             shuffle=True)
-    testloader = DataLoader(trainset(target_X_test, target_Y_test), batch_size=args.batch_size,
-                            shuffle=True)
-    '''
+
     for _ in range(args.iter):
         acc_list = []
 
 
         def f(p):
-            aug = naw.RandomWordAug(action='swap', aug_p=p, aug_min=0, aug_max=100)
+            aug = naw.WordEmbsAug(
+                model_type='glove', model_path='/demo/glove.6B.50d.txt',
+                action="substitute", aug_max=100, aug_min=0, aug_p=p)
             with torch.no_grad():
                 val_acc = 0
                 trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
@@ -115,7 +112,7 @@ if __name__ == "__main__":
         for result in results.get():
             acc_list.append(result)
 
-        with open("swap_rnn", 'a') as f:
+        with open("sub_glove_rnn", 'a') as f:
             writer = csv.writer(f)
             for i in range(len(l)):
                 writer.writerow([l[i], acc_list[i]])

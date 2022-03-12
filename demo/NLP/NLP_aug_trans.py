@@ -21,10 +21,10 @@ parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='agnews_transformer', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
 parser.add_argument("--shadow_nepoch", default=15, type=int)
-parser.add_argument("--batch_size", default=64, type=int)
-parser.add_argument("--max_iter", default=10, type=int)
-parser.add_argument("--num", default=multiprocessing.cpu_count() * 10, type=int)
-parser.add_argument("--iter", default=10, type=int)
+parser.add_argument("--batch_size", default=32, type=int)
+parser.add_argument("--max_iter", default=5, type=int)
+parser.add_argument("--num", default=multiprocessing.cpu_count() * 5, type=int)
+parser.add_argument("--iter", default=5, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -48,7 +48,9 @@ if __name__ == "__main__":
 
 
         def f(p):
-            aug = naw.RandomWordAug(action='swap', aug_p=p, aug_min=0, aug_max=100)
+            aug = naw.WordEmbsAug(
+                model_type='glove', model_path='/demo/glove.6B.50d.txt',
+                action="substitute", aug_max=100, aug_min=0, aug_p=p)
             with torch.no_grad():
                 val_acc = 0
                 trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
@@ -73,7 +75,7 @@ if __name__ == "__main__":
 
 
         numberOfThreads = multiprocessing.cpu_count()
-        pool = ThreadPool(processes=numberOfThreads)
+        pool = ThreadPool(processes=numberOfThreads // 2)
         l = [i / (args.num * 2) for i in range(args.num)]
         Chunks = np.array_split(l, len(l))
         results = pool.map_async(f, Chunks)
@@ -82,7 +84,7 @@ if __name__ == "__main__":
         for result in results.get():
             acc_list.append(result)
 
-        with open("swap_tran", 'a') as f:
+        with open("sub_glove_tran", 'a') as f:
             writer = csv.writer(f)
             for i in range(len(l)):
                 writer.writerow([l[i], acc_list[i]])

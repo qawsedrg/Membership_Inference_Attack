@@ -189,12 +189,13 @@ def memguard(scores):
 
 
 class augmentation_wrapper():
-    def __init__(self, aug, n):
+    def __init__(self, aug, n=1):
         self.aug = aug
         self.n = n
 
     def __call__(self, text):
-        return self.aug.augment(text, n=self.n, num_thread=multiprocessing.cpu_count())
+        # multiprocessing.cpu_count()
+        return self.aug.augment(text, n=self.n, num_thread=1)
 
     def to(self, *args, **kwargs):
         pass

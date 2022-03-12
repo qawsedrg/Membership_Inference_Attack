@@ -1,15 +1,14 @@
 import argparse
 import os.path
-import pickle
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
-
-from MIA.AttackModels import NoiseAttack
-from MIA.utils import trainset
+from MIA.AttackModels import BoundaryDistance
 from MIA.ShadowModels import ShadowModels
+from MIA.utils import trainset
 from model import Model
 from sklearn import datasets
 
@@ -17,7 +16,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='iris', type=str)
 parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=15, type=int)
+parser.add_argument("--shadow_nepoch", default=50, type=int)
+parser.add_argument("--attack_nepoch", default=5, type=int)
+parser.add_argument("--topx", default=-1, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -36,19 +37,11 @@ if __name__ == "__main__":
 
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
-    shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device, )
+    shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
     shadow_models.train()
 
-    attack_model = NoiseAttack(shadow_models, device)
-    attack_model.train()
-    attack_model.evaluate(target,
-                          *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
+    attack_model = BoundaryDistance(shadow_models, device)
+    attack_model.train(show=True)
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 
-    loader = DataLoader(trainset(target_X), batch_size=100, shuffle=False)
-    membership = np.array([])
-    with torch.no_grad():
-        for data in loader:
-            data = data.to(device)
-            result = attack_model(target, data)
-            membership = np.concatenate((membership, result), axis=0)
     print("fini")

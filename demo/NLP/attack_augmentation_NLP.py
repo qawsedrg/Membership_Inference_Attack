@@ -68,14 +68,16 @@ if __name__ == "__main__":
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
     aug1 = naw.WordEmbsAug(
-        model_type='glove', model_path='D:\PSC\Membership_Inference_Attack\demo\glove.6B.50d.txt',
+        model_type='glove', model_path='/demo/glove.6B.50d.txt',
         action="substitute", aug_max=5, aug_min=2, aug_p=.5)  # 20min
     aug2 = naw.BackTranslationAug(device="cuda")  # 3h#out of memory
     aug3 = naw.ContextualWordEmbsAug(device="cuda")  # 1h30
-    aug4 = naw.RandomWordAug()  # 5min
+    augs = [naw.RandomWordAug(action='delete', aug_p=p, aug_min=0, aug_max=100) for p in
+            [i / (10 * 2) for i in range(10)]]
 
-    trans = [augmentation_wrapper(aug4, 1)]
+    trans = [augmentation_wrapper(aug) for aug in augs]
 
-    attack_model = Augmentation(device, trans=trans, batch_size=64, collate_fn=collate_batch)
-    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=True)
-    membership = attack_model(target, target_X, target_Y)
+    attack_model = Augmentation(device, trans=trans, batch_size=64, collate_fn=collate_batch,
+                                times=[1 for _ in range(len(trans))])
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=False)
+    # membership = attack_model(target, target_X, target_Y)
