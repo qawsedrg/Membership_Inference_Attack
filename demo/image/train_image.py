@@ -19,8 +19,8 @@ parser.add_argument("--n_epochs", default=30, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar10', type=str)
-parser.add_argument('--alpha', default=1., type=float, help='interpolation strength (uniform=1., ERM=0.)')
-parser.add_argument('--decay', default=1e-2, type=float, help='weight decay (default=1e-2)')
+parser.add_argument('--alpha', default=1., type=float)
+parser.add_argument('--decay', default=1e-2, type=float)
 parser.add_argument('--mixup', default=True, type=bool)
 
 if __name__ == "__main__":
@@ -105,10 +105,8 @@ if __name__ == "__main__":
 
                         t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                         t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
-        # torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
-        '''
+                torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+
             if val_acc > val_acc_max:
-                print(epoch)
                 val_acc_max = val_acc
                 torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
-        '''

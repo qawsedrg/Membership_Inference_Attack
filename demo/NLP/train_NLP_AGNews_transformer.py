@@ -1,15 +1,15 @@
 import argparse
 import os.path
 
-import torch
-from torchtext.datasets import AG_NEWS
-from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
 import numpy as np
+import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from torchtext.datasets import AG_NEWS
+from tqdm import tqdm
+from transformers import AdamW
 from transformers import BertForSequenceClassification
 from transformers import BertTokenizer
-from transformers import AdamW
 
 from MIA.utils import trainset
 

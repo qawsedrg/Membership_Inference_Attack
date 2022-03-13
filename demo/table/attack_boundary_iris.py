@@ -3,14 +3,12 @@ import os.path
 
 import numpy as np
 import torch
-import torch.nn.functional as F
-from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader
 from MIA.AttackModels import BoundaryDistance
-from MIA.ShadowModels import ShadowModels
-from MIA.utils import trainset
-from model import Model
 from sklearn import datasets
+from sklearn.model_selection import train_test_split
+
+from MIA.ShadowModels import ShadowModels
+from model import Model
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)

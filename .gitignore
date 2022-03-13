@@ -1,4 +1,4 @@
-/data/
+/demo/data/
 /models/
 /demo/models/
 /demo/test/test2.py
@@ -13,3 +13,4 @@
 /demo/dist_shadow_out_noise
 /demo/NLP/glove.6B.50d.txt
 /demo/test/test6.py
+/demo/data/

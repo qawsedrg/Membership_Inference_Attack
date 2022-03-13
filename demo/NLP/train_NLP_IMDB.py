@@ -1,17 +1,17 @@
 import argparse
 import os.path
 
-import torch
-from torchtext.datasets import IMDB
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
-from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
 import numpy as np
+import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from torchtext.data.utils import get_tokenizer
+from torchtext.datasets import IMDB
+from torchtext.vocab import build_vocab_from_iterator
+from tqdm import tqdm
 
-from model import TextClassificationModel
 from MIA.utils import trainset
+from model import TextClassificationModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=30, type=int)

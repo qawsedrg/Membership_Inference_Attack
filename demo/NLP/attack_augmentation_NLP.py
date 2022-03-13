@@ -1,18 +1,17 @@
 import argparse
 import os.path
 
+import nlpaug.augmenter.word as naw
 import numpy as np
 import torch
-from torchtext.datasets import AG_NEWS
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
-from sklearn.model_selection import train_test_split
-import nlpaug.augmenter.word as naw
-import nlpaug.augmenter.sentence as nas
-
 from MIA.AttackModels import Augmentation
-from model import TextClassificationModel
+from sklearn.model_selection import train_test_split
+from torchtext.data.utils import get_tokenizer
+from torchtext.datasets import AG_NEWS
+from torchtext.vocab import build_vocab_from_iterator
+
 from MIA.utils import augmentation_wrapper
+from model import TextClassificationModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)

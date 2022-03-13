@@ -4,13 +4,14 @@ import os.path
 import numpy as np
 import torch
 import torch.nn.functional as F
+from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
-from MIA.AttackModels import ConfidenceVector
+
+from MIA.Attack.ConfVector import ConfVector
 from MIA.ShadowModels import ShadowModels
 from MIA.utils import trainset
 from model import Model
-from sklearn import datasets
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
     shadow_models.train()
 
-    attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
+    attack_model = ConfVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
     attack_model.show()
     attack_model.evaluate()

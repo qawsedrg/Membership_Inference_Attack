@@ -1,21 +1,21 @@
-import os
-import torch
 import argparse
-from torchtext.datasets import AG_NEWS
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
-from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
-import nlpaug.augmenter.word as naw
-from tqdm import tqdm
-import numpy as np
-from multiprocessing.pool import ThreadPool
-import multiprocessing
-import nlpaug.augmenter.sentence as nas
 import csv
+import multiprocessing
+import os
+from multiprocessing.pool import ThreadPool
 
-from model import TextClassificationModel
+import nlpaug.augmenter.word as naw
+import numpy as np
+import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from torchtext.data.utils import get_tokenizer
+from torchtext.datasets import AG_NEWS
+from torchtext.vocab import build_vocab_from_iterator
+from tqdm import tqdm
+
 from MIA.utils import trainset
+from model import TextClassificationModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
@@ -78,8 +78,8 @@ if __name__ == "__main__":
 
         def f(p):
             aug = naw.WordEmbsAug(
-                model_type='glove', model_path='/demo/glove.6B.50d.txt',
-                action="substitute", aug_max=100, aug_min=0, aug_p=p)
+                model_type='glove', model_path='./glove.6B.50d.txt',
+                action="insert", aug_max=100, aug_min=0, aug_p=p)
             with torch.no_grad():
                 val_acc = 0
                 trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
@@ -87,7 +87,7 @@ if __name__ == "__main__":
                 with tqdm(enumerate(trainloader, 0), total=args.max_iter) as t:
                     for i, data in t:
                         correct_items = 0
-                        auged = aug.augment(list(data[0]), num_thread=12)
+                        auged = aug.augment(list(data[0]), num_thread=1)
                         data = collate_batch(list(zip(auged, data[1])))
                         data = [d.to(device) for d in data]
                         label = data[-1]
@@ -112,7 +112,7 @@ if __name__ == "__main__":
         for result in results.get():
             acc_list.append(result)
 
-        with open("sub_glove_rnn", 'a') as f:
+        with open("insert_glove_rnn", 'a') as f:
             writer = csv.writer(f)
             for i in range(len(l)):
                 writer.writerow([l[i], acc_list[i]])

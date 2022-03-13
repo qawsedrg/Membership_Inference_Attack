@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision.transforms as T
 from cleverhans.torch.attacks.carlini_wagner_l2 import carlini_wagner_l2
 from torch import nn
 from torch.utils.data import DataLoader
@@ -16,12 +17,14 @@ from MIA.utils import trainset, get_threshold
 
 
 class Boundary():
-    def __init__(self, shadowmodel: ShadowModels, device: torch.device, transform: Optional = None):
+    def __init__(self, shadowmodel: ShadowModels, device: torch.device, classes: int,
+                 transform: Optional[T.Compose] = None):
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
         self.transform = transform
+        self.classes = classes
 
     def train(self, show=False) -> Tuple[float, float]:
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
@@ -55,15 +58,16 @@ class Boundary():
                     y_pred = F.softmax(model(xbatch), dim=-1)
                 x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
                 dist_adv.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
-                # num_iteration
-                x_adv_curr = carlini_wagner_l2(model, x_selected, n_classes=3)
-                d = torch.sqrt(torch.sum(torch.square(x_adv_curr - x_selected), dim=1)).cpu().numpy()
+                x_adv_curr = carlini_wagner_l2(model, x_selected, n_classes=self.classes)
+                d = torch.sqrt(torch.sum(torch.square(x_adv_curr - x_selected),
+                                         dim=tuple(range(1, len(x_adv_curr.shape))))).cpu().numpy()
                 dist_adv.extend(d)
         return dist_adv
 
     def __call__(self, model, X: torch.Tensor) -> np.ndarray:
-        x_adv_curr = carlini_wagner_l2(model, X, n_classes=3)
-        d = torch.sqrt(torch.sum(torch.square(x_adv_curr - X), dim=(1, 2, 3))).cpu().numpy()
+        x_adv_curr = carlini_wagner_l2(model, X, n_classes=self.classes)
+        d = torch.sqrt(
+            torch.sum(torch.square(x_adv_curr - X), dim=tuple(range(1, len(x_adv_curr.shape))))).cpu().numpy()
         return d > self.acc_thresh
 
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,

@@ -1,30 +1,31 @@
 import argparse
+import csv
 import os.path
 
 import numpy as np
 import torch
-from torchtext.datasets import AG_NEWS
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
 from sklearn.model_selection import train_test_split
+from torchtext.data.utils import get_tokenizer
+from torchtext.datasets import IMDB
+from torchtext.vocab import build_vocab_from_iterator
 
-from MIA.AttackModels import ConfidenceVector
+from MIA.Attack.ConfVector import ConfVector
 from MIA.ShadowModels import ShadowModels
 from model import TextClassificationModel
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='agnews', type=str)
-parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=30, type=int)
-parser.add_argument("--attack_nepoch", default=5, type=int)
-parser.add_argument("--topx", default=-1, type=int)
+for n in range(1, 51):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save_to", default='models', type=str)
+    parser.add_argument("--name", default='imdb', type=str)
+    parser.add_argument("--shadow_num", default=1, type=int)
+    parser.add_argument("--shadow_nepoch", default=n, type=int)
+    parser.add_argument("--attack_nepoch", default=5, type=int)
+    parser.add_argument("--topx", default=-1, type=int)
 
-if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    train_iter = AG_NEWS(split='train')
+    train_iter = IMDB(split='train')
     tokenizer = get_tokenizer('basic_english')
 
 
@@ -51,7 +52,7 @@ if __name__ == "__main__":
         return text_list, offsets, label_list
 
 
-    num_class = len(set([label for (label, text) in AG_NEWS(split='train')]))
+    num_class = len(set([label for (label, text) in IMDB(split='train')]))
     vocab_size = len(vocab)
     emsize = 64
     target = TextClassificationModel(vocab_size, emsize, num_class)
@@ -61,18 +62,24 @@ if __name__ == "__main__":
     net = TextClassificationModel(vocab_size, emsize, num_class)
     net.to(device)
 
-    train_iter, test_iter = AG_NEWS()
+    train_iter, test_iter = IMDB()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
-    train_iter, test_iter = AG_NEWS()
-    Y = np.concatenate(([tup[0] for tup in list(train_iter)], [tup[0] for tup in list(test_iter)])).astype(np.int64) - 1
+    train_iter, test_iter = IMDB()
+    Y = np.concatenate(([0 if tup[0] == "neg" else 1 for tup in list(train_iter)],
+                        [0 if tup[0] == "neg" else 1 for tup in list(test_iter)])).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
 
     optimizer = torch.optim.SGD
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device,
                                  collate_fn=collate_batch, opt=optimizer, lr=5)
-    shadow_models.train()
+    acc, val_acc = shadow_models.train()
 
-    attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
+    attack_model = ConfVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
-    attack_model.evaluate()
-    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
+    shadow_acc, shadow_prec = attack_model.evaluate()
+    target_acc, target_prec = attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5,
+                                                                              random_state=42))
+
+    with open("rnn_imdb_conf", 'a') as f:
+        writer = csv.writer(f)
+        writer.writerow([n, acc, val_acc, shadow_acc, shadow_prec, target_acc, target_prec])

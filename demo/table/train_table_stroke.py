@@ -1,19 +1,20 @@
 # confidence boudary
-import pickle
-import os.path
 import argparse
+import os.path
+
 import numpy as np
 import pandas as pd
+import torch
+import torch.optim as optim
+from opacus.optimizers import DPOptimizer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
-import torch
 from torch.utils.data import DataLoader
-import torch.optim as optim
 from tqdm import tqdm
-from MIA.utils import trainset, mix
+
+from MIA.utils import trainset
 from model import Model1
-from opacus.optimizers import DPOptimizer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)

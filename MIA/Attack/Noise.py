@@ -15,18 +15,18 @@ from MIA.utils import trainset, get_threshold
 
 
 class Noise():
-    def __init__(self, shadowmodel: ShadowModels, device: torch.device, transform: Optional = None):
+    def __init__(self, shadowmodel: ShadowModels, stddev, device: torch.device, transform: Optional = None):
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
-        self.stddev = np.linspace(2, 10, 100)
+        # np.linspace(2, 10, 100)
+        self.stddev = stddev
         self.noisesamples = 100
         self.transform = transform
 
     def train(self, show=False) -> Tuple[float, float]:
         if not os.path.exists("./dist_shadow_in_noise") or not os.path.exists("./dist_shadow_out_noise"):
-            # todo many shadow models
             dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.stddev,
                                              self.noisesamples)
             dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.stddev,
@@ -67,7 +67,7 @@ class Noise():
                     for dev in stddev:
                         noise = torch.from_numpy(dev * np.random.randn(noise_samples, *x_selected.shape[1:])).to(
                             self.device)
-                        # 注意范围
+                        # range! attention!
                         # x_noisy = torch.clamp(x_selected[i, :] + noise, 0, 1).float()
                         x_noisy = (x_selected[i, :] + noise).float()
                         b_size = 100

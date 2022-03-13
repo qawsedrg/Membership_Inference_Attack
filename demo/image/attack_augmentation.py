@@ -7,14 +7,12 @@ import torchvision
 import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 
-from MIA.AttackModels import Augmentation
+from MIA.Attack.Augmentation import Augmentation
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar10', type=str)
-parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=15, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -24,7 +22,6 @@ if __name__ == "__main__":
     target.to(device)
     target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
-    # todo: should be repalced by a hill-climbing and GAN
     train = torchvision.datasets.CIFAR10(root='../data', train=True,
                                          download=True)
     test = torchvision.datasets.CIFAR10(root='../data', train=False,
@@ -35,6 +32,10 @@ if __name__ == "__main__":
     transform = T.Compose(
         [T.ToTensor(),
          T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    attack_model = Augmentation(device, transform=transform)
-    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=True)
+
+    trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
+    times = [5 for _ in range(len(trans))]
+    attack_model = Augmentation(device, trans, times, transform=transform)
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=False)
+
     membership = attack_model(target, target_X, target_Y)

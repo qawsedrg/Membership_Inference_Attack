@@ -1,5 +1,6 @@
 from torch import nn
 
+
 class TextClassificationModel(nn.Module):
 
     def __init__(self, vocab_size, embed_dim, num_class):

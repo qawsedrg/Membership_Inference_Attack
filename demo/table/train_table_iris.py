@@ -1,14 +1,16 @@
-import os.path
 import argparse
+import os.path
+
 import numpy as np
+import torch
+import torch.optim as optim
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from torch import nn
-import torch
 from torch.utils.data import DataLoader
-import torch.optim as optim
 from tqdm import tqdm
-from MIA.utils import trainset, mix
+
+from MIA.utils import trainset
 from model import Model
 
 parser = argparse.ArgumentParser()

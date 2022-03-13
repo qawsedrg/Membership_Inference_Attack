@@ -1,17 +1,16 @@
 import argparse
 import os.path
-import pickle
 
 import numpy as np
 import torch
+from MIA.AttackModels import NoiseAttack
+from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import NoiseAttack
-from MIA.utils import trainset
 from MIA.ShadowModels import ShadowModels
+from MIA.utils import trainset
 from model import Model
-from sklearn import datasets
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)

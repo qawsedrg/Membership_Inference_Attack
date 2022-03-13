@@ -1,8 +1,9 @@
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+
 import numpy as np
 import torch
-from torch import nn
-from multiprocessing.pool import ThreadPool
-import multiprocessing
+import torch.nn.functional as F
 
 
 class DataGenerator:
@@ -73,36 +74,3 @@ class DataGenerator:
         for result in results.get():
             x_syn = np.concatenate((x_syn, result)) if x_syn.shape != (0,) else result
         return x_syn
-
-
-if __name__ == "__main__":
-    import torch.nn.functional as F
-
-
-    class Model(nn.Module):
-        def __init__(self, n):
-            super().__init__()
-            self.fc1 = nn.Linear(n, 1024)
-            self.fc2 = nn.Linear(1024, 512)
-            self.fc3 = nn.Linear(512, 100)
-
-        def forward(self, x):
-            x = F.relu(self.fc1(x))
-            x = F.relu(self.fc2(x))
-            x = self.fc3(x)
-            return x
-
-
-    import argparse
-    import os.path
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--save_to", default='D:\PSC\Membership_Inference_Attack\demo\models', type=str)
-    parser.add_argument("--name", default='purchase', type=str)
-    args = parser.parse_args()
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = Model(600)
-    net.to(device)
-    net.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
-    d = DataGenerator(net, 100, 600, 10, 10, "int", device)
-    print(d())

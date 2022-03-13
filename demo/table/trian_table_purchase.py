@@ -1,14 +1,16 @@
 # confidence boudary
-import pickle
-import os.path
 import argparse
+import os.path
+import pickle
+
 import numpy as np
+import torch
+import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch import nn
-import torch
 from torch.utils.data import DataLoader
-import torch.optim as optim
 from tqdm import tqdm
+
 from MIA.utils import trainset, mixup_data, mixup_criterion
 from model import Model
 
@@ -24,9 +26,9 @@ parser.add_argument('--mixup', default=False, type=bool)
 if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    with open("../../data/purchase_x", "rb") as f:
+    with open("../data/purchase_x", "rb") as f:
         X = pickle.load(f).astype(np.float32)
-    with open("../../data/purchase_y", "rb") as f:
+    with open("../data/purchase_y", "rb") as f:
         Y = pickle.load(f).astype(np.longlong)
 
     Y = np.squeeze(Y)

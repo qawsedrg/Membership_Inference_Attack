@@ -1,15 +1,15 @@
 import argparse
 import os.path
-import pickle
-from sklearn.preprocessing import LabelEncoder
+
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+from MIA.AttackModels import ConfidenceVector
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import ConfidenceVector
 from MIA.ShadowModels import ShadowModels
 from MIA.utils import trainset
 from model import Model1

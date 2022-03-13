@@ -9,7 +9,7 @@ import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import ConfidenceVector
+from MIA.Attack.ConfVector import ConfVector
 from MIA.ShadowModels import ShadowModels
 from MIA.utils import trainset
 from model import CIFAR
@@ -17,9 +17,9 @@ from model import CIFAR
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar10', type=str)
-parser.add_argument("--shadow_num", default=1, type=int)
-parser.add_argument("--shadow_nepoch", default=30, type=int)
-parser.add_argument("--attack_nepoch", default=15, type=int)
+parser.add_argument("--shadow_num", default=2, type=int)
+parser.add_argument("--shadow_nepoch", default=10, type=int)
+parser.add_argument("--attack_nepoch", default=5, type=int)
 parser.add_argument("--topx", default=-1, type=int)
 
 if __name__ == "__main__":
@@ -33,7 +33,6 @@ if __name__ == "__main__":
     target.to(device)
     target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
-    # todo: should be repalced by a hill-climbing and GAN
     train = torchvision.datasets.CIFAR10(root='../data', train=True,
                                          download=True)
     test = torchvision.datasets.CIFAR10(root='../data', train=False,
@@ -47,8 +46,9 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device, transform)
     shadow_models.train()
 
-    attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx, transform)
+    attack_model = ConfVector(shadow_models, args.attack_nepoch, device, args.topx, transform)
     attack_model.train()
+    attack_model.show()
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 

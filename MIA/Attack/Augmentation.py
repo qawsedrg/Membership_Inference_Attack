@@ -60,11 +60,6 @@ class Augmentation():
 
             ax = fig.add_subplot()
 
-            '''
-            ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], c=kmeans.labels_[:len(data_x_in)], marker='^',
-                       label="Not Trained")
-            ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], c=kmeans.labels_[len(data_x_in):], marker='o', label="Trained")
-            '''
             ax.scatter(X_out_tsne[:, 0], X_out_tsne[:, 1], marker='^',
                        label="Not Trained")
             ax.scatter(X_in_tsne[:, 0], X_in_tsne[:, 1], marker='o', label="Trained")

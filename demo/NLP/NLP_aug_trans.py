@@ -1,16 +1,16 @@
-import os
-import torch
 import argparse
-from torchtext.datasets import AG_NEWS
-from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
-import nlpaug.augmenter.word as naw
-from tqdm import tqdm
-import numpy as np
-from multiprocessing.pool import ThreadPool
-import multiprocessing
-import nlpaug.augmenter.sentence as nas
 import csv
+import multiprocessing
+import os
+from multiprocessing.pool import ThreadPool
+
+import nlpaug.augmenter.word as naw
+import numpy as np
+import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from torchtext.datasets import AG_NEWS
+from tqdm import tqdm
 from transformers import BertForSequenceClassification
 from transformers import BertTokenizer
 
@@ -49,8 +49,8 @@ if __name__ == "__main__":
 
         def f(p):
             aug = naw.WordEmbsAug(
-                model_type='glove', model_path='/demo/glove.6B.50d.txt',
-                action="substitute", aug_max=100, aug_min=0, aug_p=p)
+                model_type='glove', model_path='./glove.6B.50d.txt',
+                action="insert", aug_max=100, aug_min=0, aug_p=p)
             with torch.no_grad():
                 val_acc = 0
                 trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
 
         numberOfThreads = multiprocessing.cpu_count()
-        pool = ThreadPool(processes=numberOfThreads // 2)
+        pool = ThreadPool(processes=numberOfThreads)
         l = [i / (args.num * 2) for i in range(args.num)]
         Chunks = np.array_split(l, len(l))
         results = pool.map_async(f, Chunks)
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         for result in results.get():
             acc_list.append(result)
 
-        with open("sub_glove_tran", 'a') as f:
+        with open("insert_sub_glove_tran", 'a') as f:
             writer = csv.writer(f)
             for i in range(len(l)):
                 writer.writerow([l[i], acc_list[i]])

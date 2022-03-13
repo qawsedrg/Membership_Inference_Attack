@@ -5,10 +5,10 @@ import pickle
 import numpy as np
 import torch
 import torch.nn.functional as F
+from MIA.AttackModels import ConfidenceVector
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from MIA.AttackModels import ConfidenceVector
 from MIA.ShadowModels import ShadowModels
 from MIA.utils import trainset
 from model import Model
@@ -33,9 +33,9 @@ if __name__ == "__main__":
     target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
     # todo: should be repalced by a hill-climbing and GAN
-    with open("../../data/purchase_x", "rb") as f:
+    with open("../data/purchase_x", "rb") as f:
         X = pickle.load(f).astype(np.float32)
-    with open("../../data/purchase_y", "rb") as f:
+    with open("../data/purchase_y", "rb") as f:
         Y = pickle.load(f).astype(np.longlong)
     Y = np.squeeze(Y)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
