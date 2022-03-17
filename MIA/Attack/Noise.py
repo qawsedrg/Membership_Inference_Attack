@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader
+from sklearn.base import BaseEstimator
 from tqdm import tqdm
 
 from MIA import ShadowModels
@@ -15,40 +16,66 @@ from MIA.utils import trainset, get_threshold
 
 
 class Noise():
-    def __init__(self, shadowmodel: ShadowModels, stddev, device: torch.device, transform: Optional = None):
+    def __init__(self, shadowmodel: ShadowModels, stddev:np.ndarray, noisesamples:int, device: torch.device, transform: Optional = None):
+        r"""
+        Noise Attack model
+
+        Test the robutness of victime model when adding gaussien noise to the data
+
+        Compute a historam of number of data - the number of stddev with which the data is correctly classified
+
+        Deduce a simple threshold (of number of stddev) that maximizes the accuracy or precision
+
+        .. note::
+            The choice of stddev can affect greatly the result.
+
+            It should be chosen as that victime model classifies only a part of (of stddev) the noised data incorrectly (not all not none)
+
+        .. warning::
+            if needed, torch.clamp should be used to make sure that the noised data is within the valid range
+
+
+        :param shadowmodel: shadowmodel
+        :param stddev: the stddev value of the noise to be added to the data
+        :param noisesamples: number of noise to test for each stddev, to reduce the volatility of result
+        :param device: torch.device object
+        :param transform: transformation to perform on images
+        """
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
         self.pre_thresh = 0
-        # np.linspace(2, 10, 100)
+        # np.linspace(2, 10, 100) for iris
         self.stddev = stddev
-        self.noisesamples = 100
+        self.noisesamples = noisesamples
         self.transform = transform
 
-    def train(self, show=False) -> Tuple[float, float]:
-        if not os.path.exists("./dist_shadow_in_noise") or not os.path.exists("./dist_shadow_out_noise"):
-            dist_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.stddev,
+    def train(self, show:Optional[bool]=False) -> Tuple[float, float]:
+        # store the calculated number, should be modified if needed
+        # in - trained, out - not trained
+        if not os.path.exists("./num_shadow_in_noise") or not os.path.exists("./num_shadow_out_noise"):
+            num_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.stddev,
                                              self.noisesamples)
-            dist_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.stddev,
+            num_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.stddev,
                                               self.noisesamples)
-            pickle.dump(dist_shadow_in, open("./dist_shadow_in_noise", "wb"))
-            pickle.dump(dist_shadow_out, open("./dist_shadow_out_noise", "wb"))
+            pickle.dump(num_shadow_in, open("./num_shadow_in_noise", "wb"))
+            pickle.dump(num_shadow_out, open("./num_shadow_out_noise", "wb"))
         else:
-            dist_shadow_in = pickle.load(open("./dist_shadow_in_noise", "rb"))
-            dist_shadow_out = pickle.load(open("./dist_shadow_out_noise", "rb"))
-        dist_shadow = np.concatenate((dist_shadow_in, dist_shadow_out))
-        membership_shadow = np.concatenate((np.ones_like(dist_shadow_in), np.zeros_like(dist_shadow_out)))
+            num_shadow_in = pickle.load(open("./num_shadow_in_noise", "rb"))
+            num_shadow_out = pickle.load(open("./num_shadow_out_noise", "rb"))
+        num_shadow = np.concatenate((num_shadow_in, num_shadow_out))
+        membership_shadow = np.concatenate((np.ones_like(num_shadow_in), np.zeros_like(num_shadow_out)))
         if show:
-            right = max(dist_shadow)
-            plt.hist(dist_shadow_in, bins=100, range=[0, right], label="in")
-            plt.hist(dist_shadow_out, bins=100, range=[0, right], label="out")
+            right = max(num_shadow)
+            plt.hist(num_shadow_in, bins=100, range=[0, right], label="in")
+            plt.hist(num_shadow_out, bins=100, range=[0, right], label="out")
             plt.legend()
             plt.show()
-        acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, dist_shadow)
+        acc, self.acc_thresh, prec, self.pre_thresh = get_threshold(membership_shadow, num_shadow)
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
         return (acc, prec)
 
-    def train_base(self, loader, model, stddev, noise_samples) -> List[int]:
+    def train_base(self, loader:DataLoader, model:Union[BaseEstimator, nn.Module], stddev:np.ndarray, noise_samples:int) -> List[int]:
         num_in = []
         if isinstance(model, nn.Module):
             model.to(self.device)
@@ -56,12 +83,12 @@ class Noise():
             for _, data in t:
                 xbatch, ybatch = data[0].to(self.device), data[1].to(self.device)
                 with torch.no_grad():
+                    # should be changed if softmax is performed in the model
                     y_pred = F.softmax(model(xbatch), dim=-1) if isinstance(model, nn.Module) else torch.from_numpy(
                         model.predict_proba(xbatch.cpu())).to(self.device)
                 x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
                 y_selected = ybatch[torch.argmax(y_pred, dim=-1) == ybatch]
                 num_in.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
-                # num_iteration
                 for i in range(x_selected.shape[0]):
                     n = 0
                     for dev in stddev:
@@ -71,8 +98,10 @@ class Noise():
                         # x_noisy = torch.clamp(x_selected[i, :] + noise, 0, 1).float()
                         x_noisy = (x_selected[i, :] + noise).float()
                         b_size = 100
+                        # processes the noisy data by batch of size b_size if noisesamples is big
                         with torch.no_grad():
                             for j in range(noise_samples // b_size + 1):
+                                # should be changed if softmax is performed in the model
                                 y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1) if isinstance(
                                     model, nn.Module) else torch.from_numpy(
                                     model.predict_proba(x_noisy[j * b_size:(j + 1) * b_size])).to(self.device)
@@ -84,22 +113,22 @@ class Noise():
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
                  Y_out: Optional[np.ndarray] = None) -> Tuple[float, float]:
-        if not os.path.exists("./dist_target_in_noise") or not os.path.exists("./dist_target_out_noise"):
+        if not os.path.exists("./num_target_in_noise") or not os.path.exists("./num_target_out_noise"):
             loader_in = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
             loader_out = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
-            dist_target_in = self.train_base(loader_in, target, self.stddev,
+            num_target_in = self.train_base(loader_in, target, self.stddev,
                                              self.noisesamples)
-            dist_target_out = self.train_base(loader_out, target, self.stddev,
+            num_target_out = self.train_base(loader_out, target, self.stddev,
                                               self.noisesamples)
-            pickle.dump(dist_target_in, open("./dist_target_in_noise", "wb"))
-            pickle.dump(dist_target_out, open("./dist_target_out_noise", "wb"))
+            pickle.dump(num_target_in, open("./num_target_in_noise", "wb"))
+            pickle.dump(num_target_out, open("./num_target_out_noise", "wb"))
         else:
-            dist_target_in = pickle.load(open("./dist_target_in_noise", "rb"))
-            dist_target_out = pickle.load(open("./dist_target_out_noise", "rb"))
-        dist_target = np.concatenate((dist_target_in, dist_target_out))
-        membership_target = np.concatenate((np.ones_like(dist_target_in), np.zeros_like(dist_target_out)))
-        acc, _, _, _ = get_threshold(membership_target, dist_target, self.acc_thresh)
-        _, _, prec, _ = get_threshold(membership_target, dist_target, self.pre_thresh)
+            num_target_in = pickle.load(open("./num_target_in_noise", "rb"))
+            num_target_out = pickle.load(open("./num_target_out_noise", "rb"))
+        num_target = np.concatenate((num_target_in, num_target_out))
+        membership_target = np.concatenate((np.ones_like(num_target_in), np.zeros_like(num_target_out)))
+        acc, _, _, _ = get_threshold(membership_target, num_target, self.acc_thresh)
+        _, _, prec, _ = get_threshold(membership_target, num_target, self.pre_thresh)
         print("test_acc:{:},test_pre:{:}".format(acc, prec))
         return (acc, prec)
 
@@ -110,12 +139,15 @@ class Noise():
             n = 0
             for dev in self.stddev:
                 noise = torch.from_numpy(dev * np.random.randn(self.noisesamples, *X.shape[1:])).to(self.device)
-                ##
-                x_noisy = torch.clamp(X[i, :] + noise, 0, 1).float()
+                # range! attention!
+                # x_noisy = torch.clamp(X[i, :] + noise, 0, 1).float()
+                x_noisy = (X[i, :] + noise).float()
                 b_size = 100
                 with torch.no_grad():
                     for j in range(self.noisesamples // b_size + 1):
+                        # should be changed if softmax is performed in the model
                         y_pred = F.softmax(model(x_noisy[j * b_size:(j + 1) * b_size]), dim=-1)
                         n += torch.sum(torch.argmax(y_pred, dim=-1) == y[i]).item()
             num_in.append(n / self.noisesamples)
+        # can be set to pre_thresh if needed
         return np.array(num_in) > self.acc_thresh

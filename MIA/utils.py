@@ -114,6 +114,7 @@ def forward(model: nn.Module, loader: DataLoader, device: torch.device) -> torch
                 inputs = data.to(device)
                 outputs = model(inputs)
             else:
+                # multiple input of model
                 inputs = [d.to(device) for d in data[:-1]]
                 outputs = model(*inputs)
             result = torch.cat((result, outputs), dim=0)

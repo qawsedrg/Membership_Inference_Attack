@@ -21,6 +21,8 @@ class ConfVector():
         r"""
         Confidence Vector Attack model
 
+        Direct classification of confidence vectors
+
         :param shadowmodel: shadowmodel
         :param epoches: epoches to train the attack model
         :param device: torch.device object
@@ -47,11 +49,13 @@ class ConfVector():
         """
         self.attack_models = []
         if self.topx == -1:
+            # classification of whole vector, train an attack model per class
             def f(Is):
                 attack_models = []
                 for i in Is:
                     train_x = torch.cat((self.shadowdata.data_in[self.shadowdata.target_in == i],
                                          self.shadowdata.data_out[self.shadowdata.target_out == i]), dim=0)
+                    # trained - 1, not trained - 0
                     train_y = torch.cat((torch.ones(torch.sum(self.shadowdata.target_in == i).cpu().numpy()),
                                          torch.zeros(torch.sum(self.shadowdata.target_out == i).cpu().numpy()))).to(
                         self.device)
@@ -77,6 +81,7 @@ class ConfVector():
                 self.attack_models.extend(attack_model)
 
         else:
+            # classification of sorted vector with topx elements, only one attack model is trained
             train_x = torch.sort(torch.cat((self.shadowdata.data_in, self.shadowdata.data_out), dim=0), dim=-1)[0][:,
                       -self.topx:].to(self.device)
             train_y = torch.cat(
@@ -96,7 +101,7 @@ class ConfVector():
         Inference of membership
 
         .. note::
-            The output membership is not in the same order as the input X but as the output X
+            The output membership is not in the same order as the input X but as the output data_x, data_y
 
         :param X: data to infer
         :param Y: class of data to infer
@@ -108,6 +113,7 @@ class ConfVector():
             data_x = torch.Tensor().to(self.device)
             data_y = torch.Tensor().to(self.device)
             for i in range(self.n_classes):
+                # classification of whole vector, an attack model per class is trained
                 x = X[classes == i]
                 with torch.no_grad():
                     result = torch.cat((result, self.attack_models[i](x)))
@@ -180,6 +186,7 @@ class ConfVector():
             if self.topx != -1:
                 output_in = output_in[0][:, -self.topx:]
                 output_out = output_out[0][:, -self.topx:]
+            # should be changed if softmax is performed in the model
             _, _, result_in = self(F.softmax(output_in, dim=-1) if isinstance(target, nn.Module) else output_in)
             _, _, result_out = self(F.softmax(output_out, dim=-1) if isinstance(target, nn.Module) else output_out)
             correct = 0

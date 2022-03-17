@@ -19,6 +19,28 @@ from MIA.utils import trainset, get_threshold
 class Boundary():
     def __init__(self, shadowmodel: ShadowModels, device: torch.device, classes: int,
                  transform: Optional[T.Compose] = None):
+        r"""
+        Boundary Distance Attack model
+
+        For each data, compute the adversarial example using carlini_wagner_l2 attacks
+
+        The distance (euclidien) between the data and the example is consdered to be the sup borne of the distance between the data and the decision boundary
+
+        Compute a historam of number of data - distance
+
+        The larger the distance, the more likely the data is trained
+
+        Deduce a simple threshold (of distance) that maximizes the accuracy or precision
+
+        .. note::
+            It is costly to compute the distance, so only the first shadowmodel will be used
+
+
+        :param shadowmodel: shadowmodel
+        :param classes: number of classes
+        :param device: torch.device object
+        :param transform: transformation to perform on images
+        """
         self.shadowmodel = shadowmodel
         self.device = device
         self.acc_thresh = 0
@@ -27,8 +49,9 @@ class Boundary():
         self.classes = classes
 
     def train(self, show=False) -> Tuple[float, float]:
+        # store the calculated distance, should be modified if needed
+        # in - trained, out - not trained
         if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
-            # todo many shadow models
             dist_shadow_in = self.train_base(self.shadowmodel[0], self.shadowmodel.loader_train)
             dist_shadow_out = self.train_base(self.shadowmodel[0], self.shadowmodel.loader_test)
             pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
@@ -49,13 +72,18 @@ class Boundary():
         return (acc, prec)
 
     def train_base(self, model: nn.Module, loader: DataLoader) -> List[float]:
+        r"""
+        :return : List of distance to boudary for each data in loader
+        """
         dist_adv = []
         model.to(self.device)
         with tqdm(enumerate(loader, 0), total=len(loader)) as t:
             for i, data in t:
                 xbatch, ybatch = data[0].to(self.device), data[1].to(self.device)
                 with torch.no_grad():
+                    # should be changed if softmax is performed in the model
                     y_pred = F.softmax(model(xbatch), dim=-1)
+                # distance of misclassified data is set to 0
                 x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
                 dist_adv.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
                 x_adv_curr = carlini_wagner_l2(model, x_selected, n_classes=self.classes)
@@ -68,6 +96,7 @@ class Boundary():
         x_adv_curr = carlini_wagner_l2(model, X, n_classes=self.classes)
         d = torch.sqrt(
             torch.sum(torch.square(x_adv_curr - X), dim=tuple(range(1, len(x_adv_curr.shape))))).cpu().numpy()
+        # can be set to pre_thresh if needed
         return d > self.acc_thresh
 
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
