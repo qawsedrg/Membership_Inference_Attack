@@ -7,6 +7,7 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.utils.data import DataLoader
+from transformers import BertPreTrainedModel
 
 from MIA.utils import trainset, train, forward, DataStruct
 
@@ -50,23 +51,31 @@ class ShadowModels:
         Y_in = torch.Tensor().to(self.device)
         X_out = torch.Tensor().to(self.device)
         Y_out = torch.Tensor().to(self.device)
-        acc_list = 0
-        val_acc_list = 0
+        acc_list = []
+        val_acc_list = []
         for i in range(self.N):
             model = self.models
             shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
                                                                                             test_size=0.5,
                                                                                             random_state=i)
             if isinstance(model, nn.Module):
-                #torch model
+                # torch model
                 optimizer = self.opt(model.parameters(), lr=self.lr)
                 # reinitialize the model parameters
-                for idx, module in enumerate(model.modules()):
-                    if idx != 0:
-                        try:
-                            module.reset_parameters()
-                        except:
-                            pass
+                if isinstance(model, BertPreTrainedModel):
+                    for idx, module in enumerate(model.classifier.modules()):
+                        if idx != 0:
+                            try:
+                                module.reset_parameters()
+                            except:
+                                pass
+                else:
+                    for idx, module in enumerate(model.modules()):
+                        if idx != 0:
+                            try:
+                                module.reset_parameters()
+                            except:
+                                pass
                 loader = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
                                     shuffle=True,
                                     collate_fn=self.collate_fn)
@@ -97,7 +106,7 @@ class ShadowModels:
                 val_acc_list.append(val_acc)
 
             else:
-                #sklearn model
+                # sklearn model
                 model = model.fit(shadow_X_train, shadow_Y_train)
                 self.model_trained.append(model)
                 X_in = torch.cat((X_in, torch.from_numpy(model.predict_proba(shadow_X_train)).to(self.device)), dim=0)

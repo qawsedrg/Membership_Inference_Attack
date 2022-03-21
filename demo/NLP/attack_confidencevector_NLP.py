@@ -6,26 +6,26 @@ import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
 from torchtext.data.utils import get_tokenizer
-from torchtext.datasets import IMDB
+from torchtext.datasets import AG_NEWS
 from torchtext.vocab import build_vocab_from_iterator
 
 from MIA.Attack.ConfVector import ConfVector
 from MIA.ShadowModels import ShadowModels
 from model import TextClassificationModel
 
-for n in range(1, 51):
+for n in range(1, 11):
     parser = argparse.ArgumentParser()
     parser.add_argument("--save_to", default='models', type=str)
-    parser.add_argument("--name", default='imdb', type=str)
-    parser.add_argument("--shadow_num", default=1, type=int)
-    parser.add_argument("--shadow_nepoch", default=n, type=int)
+    parser.add_argument("--name", default='agnews', type=str)
+    parser.add_argument("--shadow_num", default=n, type=int)
+    parser.add_argument("--shadow_nepoch", default=30, type=int)
     parser.add_argument("--attack_nepoch", default=5, type=int)
     parser.add_argument("--topx", default=-1, type=int)
 
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    train_iter = IMDB(split='train')
+    train_iter = AG_NEWS(split='train')
     tokenizer = get_tokenizer('basic_english')
 
 
@@ -52,7 +52,7 @@ for n in range(1, 51):
         return text_list, offsets, label_list
 
 
-    num_class = len(set([label for (label, text) in IMDB(split='train')]))
+    num_class = len(set([label for (label, text) in AG_NEWS(split='train')]))
     vocab_size = len(vocab)
     emsize = 64
     target = TextClassificationModel(vocab_size, emsize, num_class)
@@ -62,12 +62,13 @@ for n in range(1, 51):
     net = TextClassificationModel(vocab_size, emsize, num_class)
     net.to(device)
 
-    train_iter, test_iter = IMDB()
+    train_iter, test_iter = AG_NEWS()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
-    train_iter, test_iter = IMDB()
-    Y = np.concatenate(([0 if tup[0] == "neg" else 1 for tup in list(train_iter)],
-                        [0 if tup[0] == "neg" else 1 for tup in list(test_iter)])).astype(np.int64)
+    train_iter, test_iter = AG_NEWS()
+    Y = np.concatenate(([tup[0] for tup in list(train_iter)], [tup[0] for tup in list(test_iter)])).astype(np.int64) - 1
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
+    target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,
+                                                                                    random_state=42)
 
     optimizer = torch.optim.SGD
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device,
@@ -80,6 +81,6 @@ for n in range(1, 51):
     target_acc, target_prec = attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5,
                                                                               random_state=42))
 
-    with open("rnn_imdb_conf", 'a') as f:
+    with open("rnn_agnews_conf_nshadowmodel", 'a') as f:
         writer = csv.writer(f)
-        writer.writerow([n, acc, val_acc, shadow_acc, shadow_prec, target_acc, target_prec])
+        writer.writerow([n, np.average(acc), np.average(val_acc), shadow_acc, shadow_prec, target_acc, target_prec])

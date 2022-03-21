@@ -1,14 +1,14 @@
 import os.path
 import pickle
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
+from sklearn.base import BaseEstimator
 from torch import nn
 from torch.utils.data import DataLoader
-from sklearn.base import BaseEstimator
 from tqdm import tqdm
 
 from MIA import ShadowModels
@@ -16,7 +16,8 @@ from MIA.utils import trainset, get_threshold
 
 
 class Noise():
-    def __init__(self, shadowmodel: ShadowModels, stddev:np.ndarray, noisesamples:int, device: torch.device, transform: Optional = None):
+    def __init__(self, shadowmodel: ShadowModels, stddev: np.ndarray, noisesamples: int, device: torch.device,
+                 transform: Optional = None):
         r"""
         Noise Attack model
 
@@ -50,14 +51,14 @@ class Noise():
         self.noisesamples = noisesamples
         self.transform = transform
 
-    def train(self, show:Optional[bool]=False) -> Tuple[float, float]:
+    def train(self, show: Optional[bool] = False) -> Tuple[float, float]:
         # store the calculated number, should be modified if needed
         # in - trained, out - not trained
         if not os.path.exists("./num_shadow_in_noise") or not os.path.exists("./num_shadow_out_noise"):
             num_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.stddev,
-                                             self.noisesamples)
+                                            self.noisesamples)
             num_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.stddev,
-                                              self.noisesamples)
+                                             self.noisesamples)
             pickle.dump(num_shadow_in, open("./num_shadow_in_noise", "wb"))
             pickle.dump(num_shadow_out, open("./num_shadow_out_noise", "wb"))
         else:
@@ -75,7 +76,12 @@ class Noise():
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
         return (acc, prec)
 
-    def train_base(self, loader:DataLoader, model:Union[BaseEstimator, nn.Module], stddev:np.ndarray, noise_samples:int) -> List[int]:
+    def train_base(self, loader: DataLoader, model: Union[BaseEstimator, nn.Module], stddev: np.ndarray,
+                   noise_samples: int) -> List[int]:
+        r"""
+
+        :return:  List of number of stddev with which the noise data is classfied correctly
+        """
         num_in = []
         if isinstance(model, nn.Module):
             model.to(self.device)
@@ -86,6 +92,7 @@ class Noise():
                     # should be changed if softmax is performed in the model
                     y_pred = F.softmax(model(xbatch), dim=-1) if isinstance(model, nn.Module) else torch.from_numpy(
                         model.predict_proba(xbatch.cpu())).to(self.device)
+                # misclassififed exemple set directly to 0 (so that they will be classified as no trained)
                 x_selected = xbatch[torch.argmax(y_pred, dim=-1) == ybatch, :]
                 y_selected = ybatch[torch.argmax(y_pred, dim=-1) == ybatch]
                 num_in.extend([0] * (xbatch.shape[0] - x_selected.shape[0]))
@@ -117,9 +124,9 @@ class Noise():
             loader_in = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
             loader_out = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
             num_target_in = self.train_base(loader_in, target, self.stddev,
-                                             self.noisesamples)
+                                            self.noisesamples)
             num_target_out = self.train_base(loader_out, target, self.stddev,
-                                              self.noisesamples)
+                                             self.noisesamples)
             pickle.dump(num_target_in, open("./num_target_in_noise", "wb"))
             pickle.dump(num_target_out, open("./num_target_out_noise", "wb"))
         else:

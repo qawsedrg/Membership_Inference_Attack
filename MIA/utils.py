@@ -6,15 +6,17 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+from sklearn.base import BaseEstimator
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import roc_curve
-from sklearn.base import BaseEstimator
 from snsynth.mwem import MWEMSynthesizer
 from torch import nn
+from torch.optim import optimizer
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from tqdm import tqdm
+from transformers import BertPreTrainedModel
 
 
 class trainset(Dataset):
@@ -37,9 +39,9 @@ class trainset(Dataset):
         return self.X.shape[0]
 
 
-def train(model: nn.Module, loader: DataLoader, device: torch.device, optimizer: torch.optim.optimizer,
+def train(model: nn.Module, loader: DataLoader, device: torch.device, optimizer: optimizer,
           criterion: nn.Module, epoches: int, eval: Optional[bool] = False, testloader: Optional[DataLoader] = None) -> \
-Tuple[nn.Module, float, float]:
+        Tuple[nn.Module, float, float]:
     r"""
     A typical pytroch training wrapper
 
@@ -49,6 +51,7 @@ Tuple[nn.Module, float, float]:
     :return: model, training accuracy, evaluation accuracy
     """
     model.to(device)
+    model.train()
     acc = None
     val_acc = None
     for epoch in range(epoches):
@@ -61,9 +64,14 @@ Tuple[nn.Module, float, float]:
                 labels = data[-1]
 
                 optimizer.zero_grad()
+                # loss_fct = CrossEntropyLoss()
+                # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
                 outputs = model(*data[:-1])
+                if not isinstance(outputs, torch.Tensor):
+                    outputs = outputs.logits
                 if len(outputs.shape) == 2:
-                    correct_items += torch.sum(torch.argmax(outputs, axis=-1) == labels).item()
+                    correct_items += torch.sum(torch.argmax(outputs, dim=-1) == labels).item()
+                # ???
                 elif len(outputs.shape) == 1:
                     correct_items += torch.sum(outputs[labels == 1] > .5).item()
                     correct_items += torch.sum(outputs[labels == 0] < .5).item()
@@ -90,6 +98,8 @@ Tuple[nn.Module, float, float]:
                     label = data[-1]
 
                     outputs = model(*data[:-1])
+                    if not isinstance(outputs, torch.Tensor):
+                        outputs = outputs.logits
                     correct_items += torch.sum(torch.argmax(outputs, dim=-1) == label).item()
                     val_acc_batch = correct_items / testloader.batch_size
                     val_acc += val_acc_batch
@@ -117,6 +127,8 @@ def forward(model: nn.Module, loader: DataLoader, device: torch.device) -> torch
                 # multiple input of model
                 inputs = [d.to(device) for d in data[:-1]]
                 outputs = model(*inputs)
+            if not isinstance(outputs, torch.Tensor):
+                outputs = outputs.logits
             result = torch.cat((result, outputs), dim=0)
     return result
 

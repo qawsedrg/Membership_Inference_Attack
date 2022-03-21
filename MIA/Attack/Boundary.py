@@ -73,7 +73,8 @@ class Boundary():
 
     def train_base(self, model: nn.Module, loader: DataLoader) -> List[float]:
         r"""
-        :return : List of distance to boudary for each data in loader
+
+        :return:  List of distance to boudary for each data in loader
         """
         dist_adv = []
         model.to(self.device)
