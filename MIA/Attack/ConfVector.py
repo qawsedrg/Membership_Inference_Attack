@@ -131,6 +131,9 @@ class ConfVector():
         Show the distribution of Ordered Confidence Vectors (3D)
 
         .. note::
+            topx if forced to 3
+
+        .. note::
             The Confidence Vectors should be longer than 3
         """
         if self.topx == -1:
@@ -184,8 +187,8 @@ class ConfVector():
             output_out = forward(target, loader, self.device) if isinstance(target, nn.Module) else forward_sklearn(
                 target, loader, self.device)
             if self.topx != -1:
-                output_in = output_in[0][:, -self.topx:]
-                output_out = output_out[0][:, -self.topx:]
+                output_in = torch.sort(output_in)[0][:, -self.topx:]
+                output_out = torch.sort(output_out)[0][:, -self.topx:]
             # should be changed if softmax is performed in the model
             _, _, result_in = self(F.softmax(output_in, dim=-1) if isinstance(target, nn.Module) else output_in)
             _, _, result_out = self(F.softmax(output_out, dim=-1) if isinstance(target, nn.Module) else output_out)
