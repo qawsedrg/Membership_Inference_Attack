@@ -23,12 +23,6 @@ parser.add_argument("--topx", default=-1, type=int)
 args = parser.parse_args()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-train_iter = AG_NEWS(split='train')
-tokenizer = get_tokenizer('basic_english')
-
-args = parser.parse_args()
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 num_class = len(set([label for (label, text) in AG_NEWS(split='train')]))

@@ -51,10 +51,11 @@ class Noise():
         self.noisesamples = noisesamples
         self.transform = transform
 
-    def train(self, show: Optional[bool] = False) -> Tuple[float, float]:
+    def train(self, show: Optional[bool] = False, reuse: Optional[bool] = True) -> Tuple[float, float]:
         # store the calculated number, should be modified if needed
         # in - trained, out - not trained
-        if not os.path.exists("./num_shadow_in_noise") or not os.path.exists("./num_shadow_out_noise"):
+        if not os.path.exists("./num_shadow_in_noise") or not os.path.exists(
+                "./num_shadow_out_noise") or reuse == False:
             num_shadow_in = self.train_base(self.shadowmodel.loader_train, self.shadowmodel[0], self.stddev,
                                             self.noisesamples)
             num_shadow_out = self.train_base(self.shadowmodel.loader_test, self.shadowmodel[0], self.stddev,
@@ -119,8 +120,9 @@ class Noise():
     def evaluate(self, target: Optional = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
-                 Y_out: Optional[np.ndarray] = None) -> Tuple[float, float]:
-        if not os.path.exists("./num_target_in_noise") or not os.path.exists("./num_target_out_noise"):
+                 Y_out: Optional[np.ndarray] = None, reuse: Optional[bool] = True) -> Tuple[float, float]:
+        if not os.path.exists("./num_target_in_noise") or not os.path.exists(
+                "./num_target_out_noise") or reuse == False:
             loader_in = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
             loader_out = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
             num_target_in = self.train_base(loader_in, target, self.stddev,

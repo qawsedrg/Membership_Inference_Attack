@@ -47,13 +47,14 @@ class Augmentation():
         self.collate_fn = collate_fn
         self.batch_size = batch_size
 
-    def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
+    def evaluate(self, target: nn.Module = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
-                 Y_out: Optional[np.ndarray] = None, show=False) -> Tuple[float, float]:
+                 Y_out: Optional[np.ndarray] = None, show: Optional[bool] = False, reuse: Optional[bool] = True) -> \
+            Tuple[float, float]:
         # store the calculated vector, should be modified if needed
         # in - trained, out - not trained
-        if not os.path.exists("./vec_x_in") or not os.path.exists("./vec_x_out"):
+        if not os.path.exists("./vec_x_in") or not os.path.exists("./vec_x_out") or reuse == False:
             loader_train = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=self.batch_size, shuffle=False)
             loader_test = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=self.batch_size, shuffle=False)
             vec_x_in = self.train_base(target, loader_train).cpu().numpy()
@@ -75,6 +76,7 @@ class Augmentation():
         print("train_acc:{:},train_pre:{:}".format(acc, prec))
         if show:
             fig = plt.figure()
+            # todo correctness
             # TSNE visualizing of vectors, the random_state should be the same (difference of distribution is partially due to the choice to random_state)
             X_in_tsne = TSNE(n_components=2, random_state=0).fit_transform(vec_x_in)
             X_out_tsne = TSNE(n_components=2, random_state=0).fit_transform(vec_x_out)
@@ -118,7 +120,10 @@ class Augmentation():
                                 data = [d.to(self.device) for d in data]
                                 xbatch = data[:-1]
                                 ybatch = data[-1]
-                                y_pred = F.softmax(model(*xbatch), dim=-1)
+                                outputs = model(*xbatch)
+                                if not isinstance(outputs, torch.Tensor):
+                                    outputs = outputs.logits
+                                y_pred = F.softmax(outputs, dim=-1)
                             result_one_step = torch.cat((result_one_step, torch.argmax(y_pred, dim=-1) == ybatch),
                                                         dim=0)
                     result_tran = torch.cat((result_tran, torch.unsqueeze(result_one_step, dim=-1)), dim=-1)

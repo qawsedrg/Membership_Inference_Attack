@@ -48,10 +48,10 @@ class Boundary():
         self.transform = transform
         self.classes = classes
 
-    def train(self, show=False) -> Tuple[float, float]:
+    def train(self, show: Optional[bool] = False, reuse: Optional[bool] = True) -> Tuple[float, float]:
         # store the calculated distance, should be modified if needed
         # in - trained, out - not trained
-        if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out"):
+        if not os.path.exists("./dist_shadow_in") or not os.path.exists("./dist_shadow_out") or reuse == False:
             dist_shadow_in = self.train_base(self.shadowmodel[0], self.shadowmodel.loader_train)
             dist_shadow_out = self.train_base(self.shadowmodel[0], self.shadowmodel.loader_test)
             pickle.dump(dist_shadow_in, open("./dist_shadow_in", "wb"))
@@ -103,8 +103,8 @@ class Boundary():
     def evaluate(self, target: Optional[nn.Module] = None, X_in: Optional[np.ndarray] = None,
                  X_out: Optional[np.ndarray] = None,
                  Y_in: Optional[np.ndarray] = None,
-                 Y_out: Optional[np.ndarray] = None) -> Tuple[float, float]:
-        if not os.path.exists("./dist_target_in") or not os.path.exists("./dist_target_out"):
+                 Y_out: Optional[np.ndarray] = None, reuse: Optional[bool] = True) -> Tuple[float, float]:
+        if not os.path.exists("./dist_target_in") or not os.path.exists("./dist_target_out") or reuse == False:
             loader_in = DataLoader(trainset(X_in, Y_in, self.transform), batch_size=64, shuffle=False)
             loader_out = DataLoader(trainset(X_out, Y_out, self.transform), batch_size=64, shuffle=False)
             dist_target_in = self.train_base(loader_in, target)

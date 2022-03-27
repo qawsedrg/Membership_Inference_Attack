@@ -16,7 +16,6 @@ from torch.optim import optimizer
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from transformers import BertPreTrainedModel
 
 
 class trainset(Dataset):
@@ -64,8 +63,6 @@ def train(model: nn.Module, loader: DataLoader, device: torch.device, optimizer:
                 labels = data[-1]
 
                 optimizer.zero_grad()
-                # loss_fct = CrossEntropyLoss()
-                # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
                 outputs = model(*data[:-1])
                 if not isinstance(outputs, torch.Tensor):
                     outputs = outputs.logits

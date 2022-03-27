@@ -190,7 +190,8 @@ class ConfVector():
                 output_in = torch.sort(output_in)[0][:, -self.topx:]
                 output_out = torch.sort(output_out)[0][:, -self.topx:]
             # should be changed if softmax is performed in the model
-            _, _, result_in = self(F.softmax(output_in, dim=-1) if isinstance(target, nn.Module) else output_in)
+            _, _, result_in = self(F.softmax(output_in, dim=-1) if
+                                   isinstance(target, nn.Module) else output_in)
             _, _, result_out = self(F.softmax(output_out, dim=-1) if isinstance(target, nn.Module) else output_out)
             correct = 0
             correct += torch.sum((result_in > 0.5)).cpu().numpy()
