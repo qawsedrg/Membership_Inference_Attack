@@ -27,7 +27,7 @@ class ShadowModels:
         :param device: torch.device object
         :param transform: transformation to perform on images
         :param collate_fn: collate_fn used in DataLoader
-        :param opt: optimizer
+        :param opt: optimizer function
         :param lr: learning rate
         :param eval: evaluate the shadowmodels and infer the confidence vectors
         """
