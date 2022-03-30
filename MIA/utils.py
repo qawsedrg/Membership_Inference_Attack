@@ -47,6 +47,7 @@ def train(model: nn.Module, device: torch.device, optimizer: Optional = None, lo
 
     .. note::
         if eval==True, must pass the testloader
+        if train==True, must pass optimizer and criterion and loader and epoches
 
     :return: model, training accuracy, evaluation accuracy
     """

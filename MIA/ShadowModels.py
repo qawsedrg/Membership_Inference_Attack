@@ -29,7 +29,7 @@ class ShadowModels:
         :param collate_fn: collate_fn used in DataLoader
         :param opt: optimizer
         :param lr: learning rate
-        :param train: if models are already trained pass False
+        :param eval: evaluate the shadowmodels and infer the confidence vectors
         """
         # TODO: multiple models with different structure
         self.models = models
@@ -56,6 +56,7 @@ class ShadowModels:
         acc_list = []
         val_acc_list = []
         if isinstance(self.models, ShadowModels):
+            # reuse the trained shadowmodels
             for i in range(self.N):
                 model = self.models[i]
                 shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
@@ -68,6 +69,9 @@ class ShadowModels:
                                          shuffle=False, collate_fn=self.collate_fn)
                 model, acc, val_acc = train(model, self.device, testloader=loader_test, eval=True, train=False)
                 model.eval()
+                # hard coded
+                # used only by boundary and noise attack model
+                # but they only use one shadowmodel
                 self.loader_train = loader_train
                 self.loader_test = loader_test
                 # in: trained, out: not trained
@@ -81,7 +85,10 @@ class ShadowModels:
                 acc_list.append(acc)
                 val_acc_list.append(val_acc)
         elif isinstance(self.models, nn.Module):
+            # torch model
             for i in range(self.N):
+                # copy the original structure and param of model to be trained
+                # ifnot the model will be trained on the already trained model
                 model = deepcopy(self.models)
                 optimizer = self.opt(model.parameters(), lr=self.lr)
                 shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
@@ -103,6 +110,9 @@ class ShadowModels:
                                               shuffle=False, collate_fn=self.collate_fn)
                     loader_test = DataLoader(trainset(shadow_X_test, shadow_Y_test, self.transform), batch_size=64,
                                              shuffle=False, collate_fn=self.collate_fn)
+                    # hard coded
+                    # used only by boundary and noise attack model
+                    # but they only use one shadowmodel
                     self.loader_train = loader_train
                     self.loader_test = loader_test
                     # in: trained, out: not trained
