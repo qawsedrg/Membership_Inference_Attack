@@ -6,7 +6,7 @@ import nlpaug.augmenter.word as naw
 import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
-from torchtext.datasets import AG_NEWS
+from torchtext.datasets import IMDB
 
 from MIA.Attack.Augmentation import Augmentation
 from MIA.utils import augmentation_wrapper
@@ -14,14 +14,14 @@ from transformers import BertForSequenceClassification, BertTokenizer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
-parser.add_argument("--name", default='agnews_transformer', type=str,
+parser.add_argument("--name", default='imdb_transformer', type=str,
                     choices=['agnews', 'agnews_transformer', 'imdb', 'imdb_transformer'])
 parser.add_argument("--method", default='delete', type=str, choices=["substitute", "swap", "delete"])
 parser.add_argument("--num", default=10, type=int)
 parser.add_argument("--repetition", default=1, type=int)
 
-for n in range(1, 11):
-    for i in range(1, 6):
+for i in range(2, 5):
+    for n in range(1, 5):
         for method in ["substitute", "swap", "delete"]:
             args = parser.parse_args()
             args.method = method
@@ -31,7 +31,7 @@ for n in range(1, 11):
 
             tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-            num_class = len(set([label for (label, text) in AG_NEWS(split='train')]))
+            num_class = len(set([label for (label, text) in IMDB(split='train')]))
             target = BertForSequenceClassification.from_pretrained('bert-base-uncased', return_dict=True,
                                                                    num_labels=num_class).to(device)
             target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
@@ -44,12 +44,15 @@ for n in range(1, 11):
                 return encoding['input_ids'], encoding['attention_mask'], labels.long()
 
 
-            train_iter, test_iter = AG_NEWS()
+            train_iter, test_iter = IMDB()
             X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
-            train_iter, test_iter = AG_NEWS()
-            Y = np.concatenate(([tup[0] for tup in list(train_iter)], [tup[0] for tup in list(test_iter)])).astype(
-                np.int64) - 1
+            train_iter, test_iter = IMDB()
+            Y = np.concatenate(([0 if tup[0] == "neg" else 1 for tup in list(train_iter)],
+                                [0 if tup[0] == "neg" else 1 for tup in list(test_iter)])).astype(np.int64)
             target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
+            target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y,
+                                                                                            test_size=0.5,
+                                                                                            random_state=42)
 
             '''
             aug1 = naw.WordEmbsAug(
@@ -63,12 +66,13 @@ for n in range(1, 11):
 
             trans = [augmentation_wrapper(aug) for aug in augs]
 
-            attack_model = Augmentation(device, trans=trans, batch_size=64, collate_fn=collate_batch,
+            attack_model = Augmentation(device, trans=trans, batch_size=32, collate_fn=collate_batch,
                                         times=[args.repetition for _ in range(len(trans))])
             acc, prec = attack_model.evaluate(target,
-                                              *train_test_split(target_X, target_Y, test_size=0.5, random_state=42),
+                                              *train_test_split(target_X[:10000], target_Y[:10000], test_size=0.5,
+                                                                random_state=42),
                                               show=False, reuse=False)
 
-            with open("RWA_agnews_trans_method", 'a') as f:
+            with open("RWA_imdb_trans_method", 'a') as f:
                 writer = csv.writer(f)
                 writer.writerow([n, i, args.method, acc, prec])

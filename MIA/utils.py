@@ -38,8 +38,9 @@ class trainset(Dataset):
         return self.X.shape[0]
 
 
-def train(model: nn.Module, loader: DataLoader, device: torch.device, optimizer: optimizer,
-          criterion: nn.Module, epoches: int, eval: Optional[bool] = False, testloader: Optional[DataLoader] = None) -> \
+def train(model: nn.Module, device: torch.device, optimizer: Optional = None, loader: Optional[DataLoader] = None,
+          criterion: Optional[nn.Module] = None, epoches: Optional[int] = None,
+          testloader: Optional[DataLoader] = None, eval: Optional[bool] = False, train: Optional[bool] = True) -> \
         Tuple[nn.Module, float, float]:
     r"""
     A typical pytroch training wrapper
@@ -51,42 +52,43 @@ def train(model: nn.Module, loader: DataLoader, device: torch.device, optimizer:
     """
     model.to(device)
     model.train()
-    acc = None
-    val_acc = None
-    for epoch in range(epoches):
-        epoch_loss = 0
-        acc = 0
-        with tqdm(enumerate(loader, 0), total=len(loader)) as t:
-            for i, data in t:
-                correct_items = 0
-                data = [d.to(device) for d in data]
-                labels = data[-1]
+    acc = 0
+    val_acc = 0
+    assert (optimizer != None and criterion != None and loader != None and epoches != None) or train == False
+    if train:
+        for epoch in range(epoches):
+            epoch_loss = 0
+            acc = 0
+            with tqdm(enumerate(loader, 0), total=len(loader)) as t:
+                for i, data in t:
+                    correct_items = 0
+                    data = [d.to(device) for d in data]
+                    labels = data[-1]
 
-                optimizer.zero_grad()
-                outputs = model(*data[:-1])
-                if not isinstance(outputs, torch.Tensor):
-                    outputs = outputs.logits
-                if len(outputs.shape) == 2:
-                    correct_items += torch.sum(torch.argmax(outputs, dim=-1) == labels).item()
-                # ???
-                elif len(outputs.shape) == 1:
-                    correct_items += torch.sum(outputs[labels == 1] > .5).item()
-                    correct_items += torch.sum(outputs[labels == 0] < .5).item()
-                else:
-                    raise
-                acc_batch = correct_items / loader.batch_size
-                acc += acc_batch
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
+                    optimizer.zero_grad()
+                    outputs = model(*data[:-1])
+                    if not isinstance(outputs, torch.Tensor):
+                        outputs = outputs.logits
+                    if len(outputs.shape) == 2:
+                        correct_items += torch.sum(torch.argmax(outputs, dim=-1) == labels).item()
+                    # ???
+                    elif len(outputs.shape) == 1:
+                        correct_items += torch.sum(outputs[labels == 1] > .5).item()
+                        correct_items += torch.sum(outputs[labels == 0] < .5).item()
+                    else:
+                        raise
+                    acc_batch = correct_items / loader.batch_size
+                    acc += acc_batch
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    optimizer.step()
 
-                epoch_loss += loss.item()
-                t.set_description("Epoch {:}/{:} Train".format(epoch + 1, epoches))
-                t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
-        acc /= i + 1
+                    epoch_loss += loss.item()
+                    t.set_description("Epoch {:}/{:} Train".format(epoch + 1, epoches))
+                    t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
+            acc /= i + 1
     if eval:
         model.eval()
-        val_acc = 0
         with torch.no_grad():
             with tqdm(enumerate(testloader, 0), total=len(testloader)) as t:
                 for i, data in t:
@@ -112,11 +114,12 @@ def forward(model: nn.Module, loader: DataLoader, device: torch.device) -> torch
     r"""
     A typical pytroch inference wrapper
     """
+    # todo visualization
     result = torch.Tensor().to(device)
     model.to(device)
     model.eval()
     with torch.no_grad():
-        for i, data in enumerate(loader, 0):
+        for i, data in tqdm(enumerate(loader, 0), total=len(loader)):
             if type(data) is torch.Tensor:
                 inputs = data.to(device)
                 outputs = model(inputs)

@@ -64,7 +64,7 @@ class ConfVector():
                     optimizer = optim.Adam(attack_model.parameters(), lr=0.001)
                     loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
                     print("Training attack model for class {:}".format(i))
-                    attack_model, _, _ = train(attack_model, loader, self.device, optimizer=optimizer,
+                    attack_model, _, _ = train(attack_model, loader=loader, device=self.device, optimizer=optimizer,
                                                criterion=nn.BCELoss(),
                                                epoches=self.epoches)
                     attack_models.append(attack_model)
@@ -91,7 +91,8 @@ class ConfVector():
             attack_model.to(self.device)
             optimizer = optim.Adam(attack_model.parameters(), lr=0.001)
             loader = DataLoader(trainset(train_x, train_y, None), batch_size=64, shuffle=True)
-            attack_model, _, _ = train(attack_model, loader, self.device, optimizer=optimizer, criterion=nn.BCELoss(),
+            attack_model, _, _ = train(attack_model, loader=loader, device=self.device, optimizer=optimizer,
+                                       criterion=nn.BCELoss(),
                                        epoches=self.epoches)
             self.attack_models.append(attack_model)
 
