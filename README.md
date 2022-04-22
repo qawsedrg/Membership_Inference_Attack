@@ -80,7 +80,7 @@ attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.
 
 ```python
 attack_model = Boundary(shadow_models, device, classes, transform)
-# historam 
+# historam
 attack_model.train(show=True)
 attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 ```
@@ -114,7 +114,7 @@ The effectiveness of this method is related to reducing overfitting.
 
 ## L2 regularization
 
-Edit the optimizer by adding the parameters of weight_decay  to add L2 regularization. 
+Edit the optimizer by adding the parameters of weight_decay  to add L2 regularization.
 
 The effectiveness of this method is related to reducing overfitting.
 
@@ -139,7 +139,7 @@ More information on the parameters of the _Synthesizer_, please refer to library
 `memguard(scores,epsilon)` is the simplified version of MemGuard proposed by [C.C.Christopher](https://github.com/cchoquette/membership-inference)
 
 ```python
-# better perform softmax before memguard 
+# better perform softmax before memguard
 output_in=F.softmax(output_in, dim=-1)
 # memguard use numpy
 output_in = memguard(output_in.cpu().numpy())
