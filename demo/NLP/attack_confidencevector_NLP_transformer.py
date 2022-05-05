@@ -5,7 +5,6 @@ import os.path
 import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
-from torchtext.data.utils import get_tokenizer
 from torchtext.datasets import IMDB
 from transformers import BertForSequenceClassification, BertTokenizer, AdamW
 
@@ -15,7 +14,7 @@ from MIA.ShadowModels import ShadowModels
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='imdb_transformer', type=str)
-parser.add_argument("--shadow_num", default=4, type=int)
+parser.add_argument("--shadow_num", default=8, type=int)
 parser.add_argument("--shadow_nepoch", default=30, type=int)
 parser.add_argument("--attack_nepoch", default=5, type=int)
 parser.add_argument("--topx", default=-1, type=int)
@@ -54,7 +53,7 @@ target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(
                                                                                 random_state=42)
 
 optimizer = AdamW
-shadow_models_pretrain = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device,
+shadow_models_pretrain = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, [5] * args.shadow_num, device,
                                       collate_fn=collate_batch, opt=optimizer, lr=1e-5, eval=False)
 shadow_models_pretrain.train()
 
@@ -69,6 +68,6 @@ for n in range(1, args.shadow_num + 1):
     target_acc, target_prec = attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5,
                                                                               random_state=42))
 
-    with open("trans_imdb_conf_nshadowmodel", 'a') as f:
+    with open("trans_imdb_conf_nshadowepoch", 'a') as f:
         writer = csv.writer(f)
-        writer.writerow([n, np.average(acc), np.average(val_acc), shadow_acc, shadow_prec, target_acc, target_prec])
+        writer.writerow([n * 5, np.average(acc), np.average(val_acc), shadow_acc, shadow_prec, target_acc, target_prec])

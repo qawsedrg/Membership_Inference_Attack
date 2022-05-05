@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 import torch
-from MIA.AttackModels import ConfidenceVector
+from MIA.Attack.ConfVector import ConfVector
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
     shadow_models.train()
 
-    attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
+    attack_model = ConfVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))

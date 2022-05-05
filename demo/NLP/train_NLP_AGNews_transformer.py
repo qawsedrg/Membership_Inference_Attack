@@ -1,5 +1,6 @@
 import argparse
 import os.path
+import csv
 
 import numpy as np
 import torch
@@ -23,6 +24,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # [CLS] 101
+    # [SEP] 102
+    # [PAD] 0
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     num_class = len(set([label for (label, text) in AG_NEWS(split='train')]))
@@ -100,6 +104,9 @@ if __name__ == "__main__":
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+        with open("train_agnews_trans", 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, acc / len(trainloader), val_acc / len(testloader)])
         if val_acc > val_acc_max:
             val_acc_max = val_acc
             # torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

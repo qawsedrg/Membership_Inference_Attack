@@ -15,13 +15,13 @@ from MIA.utils import trainset, mixup_data, mixup_criterion
 from model import CIFAR
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", default=30, type=int)
-parser.add_argument("--batch_size", default=64, type=int)
+parser.add_argument("--n_epochs", default=40, type=int)
+parser.add_argument("--batch_size", default=128, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='cifar10', type=str)
 parser.add_argument('--alpha', default=1., type=float)
-parser.add_argument('--decay', default=1e-2, type=float)
-parser.add_argument('--mixup', default=True, type=bool)
+parser.add_argument('--decay', default=0, type=float)
+parser.add_argument('--mixup', default=False, type=bool)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -32,14 +32,15 @@ if __name__ == "__main__":
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+         transforms.RandomRotation(5)])
     train = torchvision.datasets.CIFAR10(root='../data', train=True,
                                          download=True)
     test = torchvision.datasets.CIFAR10(root='../data', train=False,
                                         download=True)
     X, Y = np.concatenate((train.data, test.data)), np.concatenate((train.targets, test.targets)).astype(np.int64)
     target_X, shadow_X, target_Y, shadow_Y = train_test_split(X, Y, test_size=0.5, random_state=42)
-    target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.5,
+    target_X_train, target_X_test, target_Y_train, target_Y_test = train_test_split(target_X, target_Y, test_size=0.7,
                                                                                     random_state=42)
     trainloader = DataLoader(trainset(target_X_train, target_Y_train, transform), batch_size=args.batch_size,
                              shuffle=True, num_workers=1)
@@ -88,6 +89,7 @@ if __name__ == "__main__":
                     epoch_loss += loss.item()
                     t.set_description("Epoch {:}/{:} Train".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(acc / (i + 1)), loss="{:.3f}".format(epoch_loss / (i + 1)))
+        '''
         if (epoch + 1) % 1 == 0:
             net.eval()
             val_acc = 0
@@ -105,8 +107,5 @@ if __name__ == "__main__":
 
                         t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                         t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
-                torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
-
-            if val_acc > val_acc_max:
-                val_acc_max = val_acc
-                torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+        '''
+        torch.save(net.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

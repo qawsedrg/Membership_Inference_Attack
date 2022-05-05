@@ -80,6 +80,7 @@ for n in range(1, 11):
     shadow_acc, shadow_prec = attack_model.evaluate()
     target_acc, target_prec = attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5,
                                                                               random_state=42))
+    attack_model.show()
 
     with open("rnn_agnews_conf_nshadowmodel", 'a') as f:
         writer = csv.writer(f)

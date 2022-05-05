@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from MIA.utils import trainset
-from model import Model1
+from model import Model
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=50, type=int)
@@ -50,7 +50,7 @@ if __name__ == "__main__":
                             shuffle=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = Model1(10)
+    net = Model(10)
     net.to(device)
 
     criterion = nn.CrossEntropyLoss()

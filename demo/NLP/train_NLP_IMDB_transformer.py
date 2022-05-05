@@ -1,5 +1,6 @@
 import argparse
 import os.path
+import csv
 
 import numpy as np
 import torch
@@ -15,7 +16,7 @@ from MIA.utils import trainset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", default=30, type=int)
-parser.add_argument("--batch_size", default=64, type=int)
+parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='imdb_transformer', type=str)
 
@@ -43,9 +44,9 @@ if __name__ == "__main__":
                                                                                     random_state=42)
 
     trainloader = DataLoader(trainset(target_X_train, target_Y_train), batch_size=args.batch_size,
-                             shuffle=True)
+                             shuffle=True, num_workers=1)
     testloader = DataLoader(trainset(target_X_test, target_Y_test), batch_size=args.batch_size,
-                            shuffle=False)
+                            shuffle=False, num_workers=1)
 
     if not os.path.exists(args.save_to):
         os.makedirs(args.save_to)
@@ -85,7 +86,7 @@ if __name__ == "__main__":
         val_acc = 0
         with torch.no_grad():
             with tqdm(enumerate(testloader, 0), total=len(testloader)) as t:
-                for i, data in t:
+                for i, (text, label) in t:
                     correct_items = 0
                     encoding = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
                     input_ids = encoding['input_ids'].to(device)
@@ -101,6 +102,9 @@ if __name__ == "__main__":
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+        with open("train_imdb_trans", 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, acc / len(trainloader), val_acc / len(testloader)])
         if val_acc > val_acc_max:
             val_acc_max = val_acc
             # torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

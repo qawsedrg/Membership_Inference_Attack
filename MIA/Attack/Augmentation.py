@@ -78,8 +78,11 @@ class Augmentation():
             fig = plt.figure()
             # todo correctness
             # TSNE visualizing of vectors, the random_state should be the same (difference of distribution is partially due to the choice to random_state)
-            X_in_tsne = TSNE(n_components=2, random_state=0).fit_transform(vec_x_in)
-            X_out_tsne = TSNE(n_components=2, random_state=0).fit_transform(vec_x_out)
+            XXX = TSNE(n_components=2, random_state=0).fit_transform(np.concatenate((vec_x_in, vec_x_out)))
+            X_in_tsne = XXX[:len(vec_x_in)]
+            X_out_tsne = XXX[len(vec_x_in):]
+            # X_in_tsne = TSNE(n_components=2, random_state=0).fit_transform(vec_x_in)
+            # X_out_tsne = TSNE(n_components=2, random_state=0).fit_transform(vec_x_out)
 
             ax = fig.add_subplot()
 
@@ -127,7 +130,8 @@ class Augmentation():
                             result_one_step = torch.cat((result_one_step, torch.argmax(y_pred, dim=-1) == ybatch),
                                                         dim=0)
                     result_tran = torch.cat((result_tran, torch.unsqueeze(result_one_step, dim=-1)), dim=-1)
-                result = torch.cat((result, torch.sum(result_tran, dim=-1, keepdim=True) / self.times[i]), dim=-1)
+                # result = torch.cat((result, torch.sum(result_tran, dim=-1, keepdim=True) / self.times[i]), dim=-1)
+                result = torch.cat((result, result_tran), dim=-1)
             return result
 
         numberOfThreads = min(multiprocessing.cpu_count(), len(self.trans))

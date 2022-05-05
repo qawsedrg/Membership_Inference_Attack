@@ -5,14 +5,14 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from MIA.AttackModels import ConfidenceVector
+from MIA.Attack.ConfVector import ConfVector
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader
 
 from MIA.ShadowModels import ShadowModels
 from MIA.utils import trainset
-from model import Model1
+from model import Model
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_to", default='models', type=str)
@@ -26,10 +26,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = Model1(10)
+    net = Model(10)
     net.to(device)
 
-    target = Model1(10)
+    target = Model(10)
     target.to(device)
     target.load_state_dict(torch.load(os.path.join(args.save_to, args.name + ".pth")))
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
     shadow_models.train()
 
-    attack_model = ConfidenceVector(shadow_models, args.attack_nepoch, device, args.topx)
+    attack_model = ConfVector(shadow_models, args.attack_nepoch, device, args.topx)
     attack_model.train()
     attack_model.evaluate()
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))

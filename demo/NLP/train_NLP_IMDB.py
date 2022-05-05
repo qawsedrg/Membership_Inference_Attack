@@ -1,5 +1,6 @@
 import argparse
 import os.path
+import csv
 
 import numpy as np
 import torch
@@ -121,6 +122,9 @@ if __name__ == "__main__":
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+        with open("train_imdb_rnn", 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, acc / len(trainloader), val_acc / len(testloader)])
         if val_acc > val_acc_max:
             val_acc_max = val_acc
             # torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

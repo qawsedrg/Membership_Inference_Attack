@@ -33,9 +33,9 @@ if __name__ == "__main__":
         [T.ToTensor(),
          T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-    trans = [T.RandomRotation(5), T.RandomAffine(degrees=0, translate=(0.1, 0.1))]
+    trans = [T.RandomRotation(10)]
     times = [5 for _ in range(len(trans))]
     attack_model = Augmentation(device, trans, times, transform=transform)
-    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42), show=False)
+    attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.7, random_state=42), show=True)
 
-    membership = attack_model(target, target_X, target_Y)
+    # membership = attack_model(target, target_X, target_Y)

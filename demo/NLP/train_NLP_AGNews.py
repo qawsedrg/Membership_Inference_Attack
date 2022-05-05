@@ -1,5 +1,6 @@
 import argparse
 import os.path
+import csv
 
 import numpy as np
 import torch
@@ -18,7 +19,6 @@ parser.add_argument("--n_epochs", default=30, type=int)
 parser.add_argument("--batch_size", default=64, type=int)
 parser.add_argument("--save_to", default='models', type=str)
 parser.add_argument("--name", default='agnews', type=str)
-parser.add_argument('--decay', default=1e-2, type=float, help='weight decay (default=1e-2)')
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     model = TextClassificationModel(vocab_size, emsize, num_class).to(device)
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=5)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1)
 
     train_iter, test_iter = AG_NEWS()
     X = np.concatenate(([tup[1] for tup in list(train_iter)], [tup[1] for tup in list(test_iter)]))
@@ -121,6 +121,9 @@ if __name__ == "__main__":
                     t.set_description("Epoch {:}/{:} VAL".format(epoch + 1, args.n_epochs))
                     t.set_postfix(accuracy="{:.3f}".format(val_acc / (i + 1)))
         torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))
+        with open("train_agnews_rnn", 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, acc / len(trainloader), val_acc / len(testloader)])
         if val_acc > val_acc_max:
             val_acc_max = val_acc
             # torch.save(model.state_dict(), os.path.join(args.save_to, args.name + ".pth"))

@@ -3,7 +3,7 @@ import os.path
 
 import numpy as np
 import torch
-from MIA.AttackModels import BoundaryDistance
+from MIA.Attack.Boundary import Boundary
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     shadow_models = ShadowModels(net, args.shadow_num, shadow_X, shadow_Y, args.shadow_nepoch, device)
     shadow_models.train()
 
-    attack_model = BoundaryDistance(shadow_models, device)
+    attack_model = Boundary(shadow_models, device, 3)
     attack_model.train(show=True)
     attack_model.evaluate(target, *train_test_split(target_X, target_Y, test_size=0.5, random_state=42))
 

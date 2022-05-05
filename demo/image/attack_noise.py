@@ -44,11 +44,13 @@ if __name__ == "__main__":
                                  transform)
     shadow_models.train()
 
-    attack_model = Noise(shadow_models, [1e-3, 1e-2, 1e-1], device, transform)
+    attack_model = Noise(shadow_models, np.log([x for x in np.linspace(np.exp(0.1), np.exp(0.5), 10)]), 100, device,
+                         transform)
     attack_model.train(show=True)
-    attack_model.evaluate(target,
-                          *train_test_split(target_X[:5000, :], target_Y[:5000], test_size=0.5, random_state=42))
+    # attack_model.evaluate(target,
+    #                      *train_test_split(target_X[:5000, :], target_Y[:5000], test_size=0.5, random_state=42))
 
+    '''
     loader = DataLoader(trainset(target_X[:1000, :], transform=transform), batch_size=100, shuffle=False)
     membership = np.array([])
     with torch.no_grad():
@@ -57,3 +59,4 @@ if __name__ == "__main__":
             result = attack_model(target, data)
             membership = np.concatenate((membership, result), axis=0)
     print("fini")
+    '''
