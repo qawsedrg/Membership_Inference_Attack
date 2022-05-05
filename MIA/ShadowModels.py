@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional, Union, List
+from typing import Optional
 
 import numpy as np
 import torch
@@ -13,8 +13,7 @@ from MIA.utils import trainset, train, forward, DataStruct
 
 
 class ShadowModels:
-    def __init__(self, models, N: int, X: torch.Tensor, Y: torch.Tensor, epoches: Union[int, List],
-                 device: torch.device,
+    def __init__(self, models, N: int, X: torch.Tensor, Y: torch.Tensor, epoches: int, device: torch.device,
                  transform: Optional = None, collate_fn: Optional = None, opt: Optional = None, lr: Optional = None,
                  eval: Optional[bool] = True):
         r"""
@@ -28,9 +27,9 @@ class ShadowModels:
         :param device: torch.device object
         :param transform: transformation to perform on images
         :param collate_fn: collate_fn used in DataLoader
-        :param opt: optimizer
+        :param opt: optimizer function
         :param lr: learning rate
-        :param train: if models are already trained pass False
+        :param eval: evaluate the shadowmodels and infer the confidence vectors
         """
         # TODO: multiple models with different structure
         self.models = models
@@ -57,48 +56,44 @@ class ShadowModels:
         acc_list = []
         val_acc_list = []
         if isinstance(self.models, ShadowModels):
-            # for i in range(self.N):
-            i = self.N
-            model = self.models[i]
-            shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
-                                                                                            test_size=0.5,
-                                                                                            random_state=i)
-
-            loader_train = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
-                                      shuffle=False, collate_fn=self.collate_fn)
-            loader_test = DataLoader(trainset(shadow_X_test, shadow_Y_test, self.transform), batch_size=64,
-                                     shuffle=False, collate_fn=self.collate_fn)
-            model, acc, val_acc = train(model, self.device, testloader=loader_test, eval=True, train=False)
-            model.eval()
-            self.loader_train = loader_train
-            self.loader_test = loader_test
-            # in: trained, out: not trained
-            # should be changed if softmax is performed in the model
-            X_in = torch.cat((X_in, F.softmax(forward(model, loader_train, self.device), dim=-1)), dim=0)
-            X_out = torch.cat((X_out, F.softmax(forward(model, loader_test, self.device), dim=-1)), dim=0)
-            Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
-            Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
-            # Y_in = torch.cat((Y_in, torch.argmax(X_in, dim=-1)), dim=0)
-            # Y_out = torch.cat((Y_out, torch.argmax(X_out, dim=-1)), dim=0)
-            acc_list.append(acc)
-            val_acc_list.append(val_acc)
-
-
-
-        elif isinstance(self.models, nn.Module):
+            # reuse the trained shadowmodels
             for i in range(self.N):
-                if isinstance(self.epoches, int):
-                    model = deepcopy(self.models)
-                else:
-                    model = self.models
-                optimizer = self.opt(model.parameters(), lr=self.lr)
-                # shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
-                #                                                                                test_size=0.5,
-                #                                                                                random_state=i)
+                model = self.models[i]
                 shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
-                                                                                                test_size=0.9,
-                                                                                                random_state=42)
+                                                                                                test_size=0.5,
+                                                                                                random_state=i)
 
+                loader_train = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
+                                          shuffle=False, collate_fn=self.collate_fn)
+                loader_test = DataLoader(trainset(shadow_X_test, shadow_Y_test, self.transform), batch_size=64,
+                                         shuffle=False, collate_fn=self.collate_fn)
+                model, acc, val_acc = train(model, self.device, testloader=loader_test, eval=True, train=False)
+                model.eval()
+                # hard coded
+                # used only by boundary and noise attack model
+                # but they only use one shadowmodel
+                self.loader_train = loader_train
+                self.loader_test = loader_test
+                # in: trained, out: not trained
+                # should be changed if softmax is performed in the model
+                X_in = torch.cat((X_in, F.softmax(forward(model, loader_train, self.device), dim=-1)), dim=0)
+                X_out = torch.cat((X_out, F.softmax(forward(model, loader_test, self.device), dim=-1)), dim=0)
+                Y_in = torch.cat((Y_in, torch.from_numpy(np.array(shadow_Y_train)).to(self.device)), dim=0)
+                Y_out = torch.cat((Y_out, torch.from_numpy(np.array(shadow_Y_test)).to(self.device)), dim=0)
+                # Y_in = torch.cat((Y_in, torch.argmax(X_in, dim=-1)), dim=0)
+                # Y_out = torch.cat((Y_out, torch.argmax(X_out, dim=-1)), dim=0)
+                acc_list.append(acc)
+                val_acc_list.append(val_acc)
+        elif isinstance(self.models, nn.Module):
+            # torch model
+            for i in range(self.N):
+                # copy the original structure and param of model to be trained
+                # ifnot the model will be trained on the already trained model
+                model = deepcopy(self.models)
+                optimizer = self.opt(model.parameters(), lr=self.lr)
+                shadow_X_train, shadow_X_test, shadow_Y_train, shadow_Y_test = train_test_split(self.X, self.Y,
+                                                                                                test_size=0.5,
+                                                                                                random_state=i)
                 loader = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
                                     shuffle=True,
                                     collate_fn=self.collate_fn)
@@ -107,17 +102,17 @@ class ShadowModels:
                                         collate_fn=self.collate_fn)
                 model, acc, val_acc = train(model, self.device, loader=loader, optimizer=optimizer,
                                             criterion=nn.CrossEntropyLoss(),
-                                            epoches=self.epoches[i] if not isinstance(self.epoches,
-                                                                                      int) else self.epoches,
-                                            testloader=testloader, eval=self.eval)
-                #
-                self.model_trained.append(deepcopy(model).cpu())
+                                            epoches=self.epoches, testloader=testloader, eval=self.eval)
+                self.model_trained.append(model)
                 if self.eval:
                     model.eval()
                     loader_train = DataLoader(trainset(shadow_X_train, shadow_Y_train, self.transform), batch_size=64,
                                               shuffle=False, collate_fn=self.collate_fn)
                     loader_test = DataLoader(trainset(shadow_X_test, shadow_Y_test, self.transform), batch_size=64,
                                              shuffle=False, collate_fn=self.collate_fn)
+                    # hard coded
+                    # used only by boundary and noise attack model
+                    # but they only use one shadowmodel
                     self.loader_train = loader_train
                     self.loader_test = loader_test
                     # in: trained, out: not trained

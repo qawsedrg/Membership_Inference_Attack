@@ -47,6 +47,7 @@ def train(model: nn.Module, device: torch.device, optimizer: Optional = None, lo
 
     .. note::
         if eval==True, must pass the testloader
+        if train==True, must pass optimizer and criterion and loader and epoches
 
     :return: model, training accuracy, evaluation accuracy
     """
@@ -143,8 +144,6 @@ def forward_sklearn(model: BaseEstimator, loader: DataLoader, device: torch.devi
     result = torch.Tensor()
     with torch.no_grad():
         for i, data in tqdm(enumerate(loader, 0), total=len(loader)):
-            if i > 10:
-                break
             if type(data) is torch.Tensor:
                 inputs = data.cpu()
                 outputs = torch.from_numpy(model.predict_proba(inputs))
